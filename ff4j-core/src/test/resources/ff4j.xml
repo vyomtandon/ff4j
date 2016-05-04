@@ -20,7 +20,7 @@
   -->
 <ff4j xmlns="http://www.ff4j.org/schema/ff4j" 
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	 xsi:schemaLocation="http://www.ff4j.org/schema/ff4j http://ff4j.org/schema/ff4j-1.4.0.xsd">
+	 xsi:schemaLocation="http://www.ff4j.org/schema/ff4j ../../main/resources/ff4j-1.4.0.xsd">
 	
 	<features>
 		<feature uid="AwesomeFeature" enable="true" description="some desc" />
@@ -32,9 +32,9 @@
 			</security>
 			
 			<custom-properties>
-			  <property name="ppint" 	  value="12"   />
-			  <property name="ppdouble"   value="12.5" />
-			  <property name="ppboolean"  value="true" />
+			  <property name="ppint" 	  type="org.ff4j.property.PropertyInt" value="12"   />
+			  <property name="ppdouble"   type="double"  value="12.5" />
+			  <property name="ppboolean"  type="boolean" value="true" />
 			  <property name="ppstring"   value="hello" />
 			  <property name="ppListInt"  value="12,13,14" />
 			  <property name="myLogLevel" value="DEBUG" type="org.ff4j.property.PropertyLogLevel" />

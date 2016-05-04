@@ -26,14 +26,30 @@ import java.util.HashSet;
 /**
  * Boolean Property.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class PropertyBoolean extends AbstractProperty< Boolean > {
+public class PropertyBoolean extends Property< Boolean > {
 
     /**
      * represent a boolean propertu.
      */
     private static final long serialVersionUID = -3108407128242804565L;
+    
+    /**
+     * Default constructor.
+     */
+    public PropertyBoolean() {
+    }
+    
+    /**
+     * Constructor by property name.
+     *
+     * @param name
+     *      property name
+     */
+    public PropertyBoolean(String name) {
+        super(name);
+    }
     
     /**
      * Constructor by string expression.
@@ -57,7 +73,7 @@ public class PropertyBoolean extends AbstractProperty< Boolean > {
      *     flag value
      */
     public PropertyBoolean(String uid, boolean lvl) {
-        super(uid, lvl, new HashSet<Boolean>(Arrays.asList(Boolean.TRUE, Boolean.FALSE)));
+        super(uid, lvl, Boolean.TRUE, Boolean.FALSE);
     }
     
     /** {@inheritDoc} */

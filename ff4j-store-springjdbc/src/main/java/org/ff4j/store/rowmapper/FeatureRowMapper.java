@@ -22,25 +22,27 @@ package org.ff4j.store.rowmapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Map;
 
 import org.ff4j.core.Feature;
 import org.ff4j.core.FlippingStrategy;
-import org.ff4j.exception.FeatureAccessException;
-import org.ff4j.store.JdbcStoreConstants;
-import org.ff4j.utils.ParameterUtils;
-import org.springframework.jdbc.core.simple.ParameterizedRowMapper;
+import org.ff4j.utils.MappingUtil;
+import org.springframework.jdbc.core.RowMapper;
+
+import static org.ff4j.store.JdbcStoreConstants.*;
 
 /**
  * Mapper to convert result into
  * 
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public class FeatureRowMapper implements ParameterizedRowMapper<Feature>, JdbcStoreConstants {
+public class FeatureRowMapper implements RowMapper<Feature> {
 
     /** {@inheritDoc} */
     @Override
     public Feature mapRow(ResultSet rs, int rowNum) throws SQLException {
         String featUid = rs.getString(COL_FEAT_UID);
+        
         Feature f = new Feature(featUid, rs.getInt(COL_FEAT_ENABLE) > 0);
         f.setDescription(rs.getString(COL_FEAT_DESCRIPTION));
         f.setGroup(rs.getString(COL_FEAT_GROUPNAME));
@@ -48,19 +50,13 @@ public class FeatureRowMapper implements ParameterizedRowMapper<Feature>, JdbcSt
         // Build Flipping Strategy From DataBase
         String strategy = rs.getString(COL_FEAT_STRATEGY);
         if (strategy != null && !"".equals(strategy)) {
-            try {
-                FlippingStrategy flipStrategy = (FlippingStrategy) Class.forName(strategy).newInstance();
-                flipStrategy.init(featUid, ParameterUtils.toMap(rs.getString(COL_FEAT_EXPRESSION)));
-                f.setFlippingStrategy(flipStrategy);
-            } catch (InstantiationException ie) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, no default constructor available", ie);
-            } catch (IllegalAccessException iae) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, no visible constructor", iae);
-            } catch (ClassNotFoundException e) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, classNotFound", e);
-            }
+            Map < String, String > initParams = MappingUtil.toMap(rs.getString(COL_FEAT_EXPRESSION));
+            FlippingStrategy flipStrategy = MappingUtil.instanceFlippingStrategy(featUid, strategy, initParams);
+            f.setFlippingStrategy(flipStrategy);
         }
         return f;
+        
+      
     }
 
 }

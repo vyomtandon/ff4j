@@ -24,15 +24,19 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.Set;
 
-import org.ff4j.conf.XmlConfiguration;
+import org.ff4j.conf.XmlConfig;
 import org.ff4j.conf.XmlParser;
 import org.ff4j.core.Feature;
 import org.ff4j.core.FeatureStore;
+import org.ff4j.exception.FeatureNotFoundException;
+import org.ff4j.exception.GroupNotFoundException;
+import org.ff4j.utils.JsonUtils;
+import org.ff4j.utils.Util;
 
 /**
  * SuperClass for stores.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public abstract class AbstractFeatureStore implements FeatureStore {
 
@@ -53,15 +57,15 @@ public abstract class AbstractFeatureStore implements FeatureStore {
             throw new IllegalArgumentException("File " + xmlConfFile + " could not be read, please check path and rights");
         }
         // Use the Feature Parser
-        XmlConfiguration conf = new XmlParser().parseConfigurationFile(xmlIS);
+        XmlConfig conf = new XmlParser().parseConfigurationFile(xmlIS);
         Map < String, Feature > features = conf.getFeatures();
 
         // Override existing configuration within database
-        for (String featureName : features.keySet()) {
-            if (exist(featureName)) {
-                delete(featureName);
+        for (Map.Entry<String,Feature> featureName : features.entrySet()) {
+            if (exist(featureName.getKey())) {
+                delete(featureName.getKey());
             }
-            create(features.get(featureName));
+            create(featureName.getValue());
         }
         return features;
     }
@@ -71,12 +75,7 @@ public abstract class AbstractFeatureStore implements FeatureStore {
     public String toJson() {
         StringBuilder sb = new StringBuilder("{");
         sb.append("\"type\":\"" + this.getClass().getCanonicalName() + "\"");
-        sb.append(",\"cached\":" + this.isCached());
-        if (this.isCached()) {
-            sb.append(",\"cacheProvider\":\"" + this.getCacheProvider() + "\"");
-            sb.append(",\"cacheStore\":\"" + this.getCachedTargetStore() + "\"");
-        }
-
+        sb.append(JsonUtils.cacheJson(this));
         Set<String> myFeatures = readAll().keySet();
         sb.append(",\"numberOfFeatures\":" + myFeatures.size());
         sb.append(",\"features\":[");
@@ -102,6 +101,50 @@ public abstract class AbstractFeatureStore implements FeatureStore {
         sb.append("]");
         sb.append("}");
         return sb.toString();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return toJson();
+    }
+    
+    /**
+     * Validate feature uid.
+     *
+     * @param uid
+     *      target uid
+     */
+    protected void assertFeatureExist(String uid) {
+        Util.assertHasLength(uid);
+        if (!exist(uid)) {
+            throw new FeatureNotFoundException(uid);
+        }
+    }
+    
+    /**
+     * Validate feature uid.
+     *
+     * @param uid
+     *      target uid
+     */
+    protected void assertGroupExist(String groupName) {
+        Util.assertHasLength(groupName);
+        if (!existGroup(groupName)) {
+            throw new GroupNotFoundException(groupName);
+        }
+    }
+    
+    /**
+     * Validate feature uid.
+     *
+     * @param uid
+     *      target uid
+     */
+    protected void assertFeatureNotNull(Feature feature) {
+        if (feature == null) {
+            throw new IllegalArgumentException("Feature cannot be null nor empty");
+        }
     }
     
 }

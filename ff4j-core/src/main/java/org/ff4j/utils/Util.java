@@ -1,5 +1,7 @@
 package org.ff4j.utils;
 
+import java.lang.reflect.Constructor;
+
 /*
  * #%L
  * ff4j-core
@@ -22,16 +24,19 @@ package org.ff4j.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 /**
  * Tips and tricks to be less verbose.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public abstract class Util {
+public class Util {
     
     /** Start Color. */
     private static final String START_COLOR = "00AB8B";
@@ -39,12 +44,20 @@ public abstract class Util {
     /** End Color. */
     private static final String END_COLOR = "EEFFEE";
 
+    private Util() {
+    }
+    
     /**
-     * Remove default constructor.
+     * Check that expression is true.
+     * 
+     * @param expression
+     *            expression to evaluate
      */
-    private Util() {}
-
-    /**
+    public static boolean hasLength(String expression) {
+        return expression != null && !"".equals(expression);
+    }
+    
+   /**
      * Check that expression is true.
      * 
      * @param expression
@@ -74,9 +87,14 @@ public abstract class Util {
      * @param object
      *            target object
      */
-    public static void assertNotNull(Object object) {
-        if (object == null) {
-            throw new IllegalArgumentException("[Assertion failed] - this argument is required; it must not be null");
+    public static void assertNotNull(Object... params) {
+        if (params != null) {
+            for (int idx = 0; idx < params.length ;idx++) {
+                Object currentparam = params[idx];
+                if (null == currentparam) {
+                    throw new IllegalArgumentException("[Assertion failed] - Parameter #" + idx + "(object)  must not be null");
+                }
+            }
         }
     }
 
@@ -86,10 +104,26 @@ public abstract class Util {
      * @param object
      *            target object
      */
-    public static void assertHasLength(String text) {
-        if (null == text || text.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "[Assertion failed] - this String argument must have length; it must not be null or empty");
+    public static void assertHasLength(String... params) {
+        if (params != null) {
+            for (int idx = 0; idx < params.length ;idx++) {
+                String currentparam = params[idx];
+                if (null == currentparam || currentparam.isEmpty()) {
+                    throw new IllegalArgumentException("[Assertion failed] - Parameter #" + idx + "(string)  must not be null nor empty");
+                }
+            }
+        }
+    }
+    
+    /**
+     * Check that string is not null
+     * 
+     * @param object
+     *            target object
+     */
+    public static void assertNotEmpty(Collection<?> collec) {
+        if (null == collec || collec.isEmpty()) {
+            throw new IllegalArgumentException("[Assertion failed] - Target COLLECTION must not be null nor empty");
         }
     }
     
@@ -103,7 +137,7 @@ public abstract class Util {
      */
     public static void assertParamNotNull(String param, String paramName) {
         if (param == null || param.isEmpty()) {
-            throw new IllegalArgumentException("Parameter '" + paramName + "' cannot be null nor empty");
+            throw new IllegalArgumentException("Missing Parameter '" + paramName + "' must not be null nor empty");
         }
     }
 
@@ -114,9 +148,19 @@ public abstract class Util {
      *            enumeration of elements
      * @return
      */
-    @SuppressWarnings("unchecked")
-    public static <T> Set<T> set(T... els) {
+	public static <T> Set<T> set(T... els) {
         return new HashSet<T>(Arrays.asList(els));
+    }
+	
+	/**
+     * Create an HashSet.
+     *
+     * @param els
+     *            enumeration of elements
+     * @return
+     */
+    public static <T> List<T> list(T... els) {
+        return new ArrayList<T>(Arrays.asList(els));
     }
     
     /**
@@ -159,6 +203,60 @@ public abstract class Util {
      */
     public static List < String > getColorsGradient(int nbsectors) {
         return getColorGradient(START_COLOR, END_COLOR, nbsectors);
+    }
+    
+    /**
+     * Allow to instanciate utility class.
+     *
+     * @param utilityClass
+     *      current utility
+     * @return
+     *      instance
+     * @throws Exception
+     */
+    public static <T> T instanciatePrivate(Class<T> utilityClass) throws Exception {
+        Constructor<T> ce = utilityClass.getDeclaredConstructor();
+        ce.setAccessible(true);
+        return ce.newInstance();
+    }
+    
+    /**
+     * Get key listfrom value.
+     *
+     * @param map
+     *      current MAP
+     * @param value
+     *      value of MAP
+     * @return
+     */
+    public static <T, E> Set<T> getKeysByValue(Map<T, E> map, E value) {
+        if (map == null) return null;
+        Set<T> keys = new HashSet<T>();
+        for (Entry<T, E> entry : map.entrySet()) {
+            if (value != null && value.equals(entry.getValue())) {
+                keys.add(entry.getKey());
+            }
+        }
+        return keys;
+    }
+    
+    /**
+     * Get a first key matching from value.
+     *
+     * @param map
+     *      current MAP
+     * @param value
+     *      value of MAP
+     * @return
+     */
+    public static <T, E> T getFirstKeyByValue(Map<T, E> map, E value) {
+        if (map == null) return null;
+        for (Entry<T, E> entry : map.entrySet()) {
+            if (value != null && value.equals(entry.getValue())) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
 }

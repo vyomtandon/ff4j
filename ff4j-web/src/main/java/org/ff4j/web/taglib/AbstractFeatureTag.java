@@ -27,14 +27,15 @@ import javax.servlet.jsp.PageContext;
 import javax.servlet.jsp.tagext.TagSupport;
 
 import org.ff4j.FF4j;
-import org.ff4j.web.embedded.ConsoleConstants;
+
+import static org.ff4j.web.embedded.ConsoleConstants.*;
 
 /**
  * Parent class for FF4J TagLib library.
  * 
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public abstract class AbstractFeatureTag extends TagSupport implements ConsoleConstants {
+public abstract class AbstractFeatureTag extends TagSupport {
 
     /** serial number. */
     private static final long serialVersionUID = 3967425494402133171L;
@@ -47,6 +48,9 @@ public abstract class AbstractFeatureTag extends TagSupport implements ConsoleCo
 
     /** Injected by JSP itSelf. */
     private String featureid = "";
+    
+    /** Share httpSession with Flipping execution context, as consuming keep at minimum. */
+    private boolean shareHttpSession = false;
 
     /** FF4j bean name. */
     private final String ff4jAttributeName = FF4J_SESSIONATTRIBUTE_NAME;
@@ -121,6 +125,25 @@ public abstract class AbstractFeatureTag extends TagSupport implements ConsoleCo
      */
     public String getFf4jAttributeName() {
         return ff4jAttributeName;
+    }
+
+    /**
+     * Getter accessor for attribute 'shareHttpSession'.
+     *
+     * @return
+     *       current value of 'shareHttpSession'
+     */
+    public boolean isShareHttpSession() {
+        return shareHttpSession;
+    }
+
+    /**
+     * Setter accessor for attribute 'shareHttpSession'.
+     * @param shareHttpSession
+     * 		new value for 'shareHttpSession '
+     */
+    public void setShareHttpSession(boolean shareHttpSession) {
+        this.shareHttpSession = shareHttpSession;
     }
 
 }

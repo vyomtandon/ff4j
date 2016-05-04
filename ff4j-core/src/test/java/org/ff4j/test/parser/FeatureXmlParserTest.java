@@ -27,19 +27,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
-import org.ff4j.conf.XmlConfiguration;
+import org.ff4j.conf.XmlConfig;
 import org.ff4j.conf.XmlParser;
+import org.ff4j.conf.XmlParserErrorHandler;
 import org.ff4j.core.Feature;
-import org.ff4j.property.AbstractProperty;
+import org.ff4j.property.Property;
 import org.ff4j.property.PropertyLogLevel;
 import org.ff4j.property.PropertyLogLevel.LogLevel;
 import org.junit.Assert;
 import org.junit.Test;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 /**
  * Unit Testing
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class FeatureXmlParserTest {
     @Test
@@ -130,13 +133,13 @@ public class FeatureXmlParserTest {
         // Given
         XmlParser parser = new XmlParser();
         InputStream in = getClass().getClassLoader().getResourceAsStream("ff4j-parser-all.xml");
-        XmlConfiguration conf = parser.parseConfigurationFile(in);
+        XmlConfig conf = parser.parseConfigurationFile(in);
         Assert.assertNotNull(conf.getFeatures());
         Assert.assertNotNull(conf.getProperties());
         // When
         InputStream in3 = parser.exportAll(conf);
         // Then
-        XmlConfiguration conf2 = parser.parseConfigurationFile(in3);
+        XmlConfig conf2 = parser.parseConfigurationFile(in3);
         Assert.assertNotNull(conf2.getFeatures());
         Assert.assertNotNull(conf2.getProperties());
     }
@@ -148,7 +151,7 @@ public class FeatureXmlParserTest {
         InputStream in = getClass().getClassLoader().getResourceAsStream("ff4j.xml");
         
         // When
-        XmlConfiguration conf = parser.parseConfigurationFile(in);
+        XmlConfig conf = parser.parseConfigurationFile(in);
         // Then
         Map<String, Feature> features = conf.getFeatures();
         Assert.assertNotNull(features);
@@ -168,10 +171,8 @@ public class FeatureXmlParserTest {
         Assert.assertEquals(pll.getValue(), LogLevel.DEBUG);
         
         // Then
-        Map < String, AbstractProperty<?>> properties = conf.getProperties();
+        Map < String, Property<?>> properties = conf.getProperties();
         Assert.assertNotNull(properties);
-        System.out.println(properties);
-        
     }
     
     @Test
@@ -180,12 +181,12 @@ public class FeatureXmlParserTest {
         XmlParser parser = new XmlParser();
         InputStream in = getClass().getClassLoader().getResourceAsStream("ff4j-parser-all.xml");
         // When
-        XmlConfiguration conf = parser.parseConfigurationFile(in);
+        XmlConfig conf = parser.parseConfigurationFile(in);
         // Then
         Map<String, Feature> features = conf.getFeatures();
         Assert.assertNotNull(features);
         // Then
-        Map < String, AbstractProperty<?>> properties = conf.getProperties();
+        Map < String, Property<?>> properties = conf.getProperties();
         Assert.assertNotNull(properties);
     }
     
@@ -195,12 +196,12 @@ public class FeatureXmlParserTest {
         XmlParser parser = new XmlParser();
         InputStream in = getClass().getClassLoader().getResourceAsStream("ff4j-parser-features.xml");
         // When
-        XmlConfiguration conf = parser.parseConfigurationFile(in);
+        XmlConfig conf = parser.parseConfigurationFile(in);
         // Then
         Map<String, Feature> features = conf.getFeatures();
         Assert.assertNotNull(features);
         // Then
-        Map < String, AbstractProperty<?>> properties = conf.getProperties();
+        Map < String, Property<?>> properties = conf.getProperties();
         Assert.assertNotNull(properties);
     }
     
@@ -211,15 +212,27 @@ public class FeatureXmlParserTest {
         XmlParser parser = new XmlParser();
         InputStream in = getClass().getClassLoader().getResourceAsStream("ff4j-parser-properties.xml");
         // When
-        XmlConfiguration conf = parser.parseConfigurationFile(in);
+        XmlConfig conf = parser.parseConfigurationFile(in);
         // Then
         Map<String, Feature> features = conf.getFeatures();
         Assert.assertNotNull(features);
         // Then
-        Map < String, AbstractProperty<?>> properties = conf.getProperties();
+        Map < String, Property<?>> properties = conf.getProperties();
         Assert.assertNotNull(properties);
     }
     
+    @Test(expected = SAXParseException.class)
+    public void testErrorHandler() throws SAXException {
+        XmlParserErrorHandler eh = new XmlParserErrorHandler();
+        eh.warning(null);
+        eh.fatalError(new SAXParseException("", null));
+    }
     
+    @Test(expected = SAXParseException.class)
+    public void testErrorHandler2() throws SAXException {
+        XmlParserErrorHandler eh = new XmlParserErrorHandler();
+        eh.warning(null);
+        eh.error(new SAXParseException("", null));
+    }
 
 }

@@ -1,21 +1,29 @@
 package org.ff4j.property.store;
 
+import static org.ff4j.utils.JdbcUtils.closeConnection;
+import static org.ff4j.utils.JdbcUtils.closeResultSet;
+import static org.ff4j.utils.JdbcUtils.closeStatement;
+import static org.ff4j.utils.JdbcUtils.buildStatement;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import javax.sql.DataSource;
 
-import org.ff4j.exception.FeatureAccessException;
+import org.ff4j.exception.PropertyAccessException;
 import org.ff4j.exception.PropertyAlreadyExistException;
 import org.ff4j.exception.PropertyNotFoundException;
-import org.ff4j.property.AbstractProperty;
-import org.ff4j.store.JdbcStoreConstants;
+import org.ff4j.property.Property;
+import org.ff4j.store.JdbcQueryBuilder;
 import org.ff4j.utils.Util;
 
+import static org.ff4j.store.JdbcStoreConstants.*;
 /*
  * #%L
  * ff4j-core
@@ -39,16 +47,22 @@ import org.ff4j.utils.Util;
 /**
  * Access information related to properties within database.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class JdbcPropertyStore extends AbstractPropertyStore implements  JdbcStoreConstants {
+public class JdbcPropertyStore extends AbstractPropertyStore {
 
     /** Access to storage. */
     private DataSource dataSource;
     
+    /** Query builder. */
+    private JdbcQueryBuilder queryBuilder;
+    
     /** Mapper. */
     private JdbcPropertyMapper JDBC_MAPPER = new JdbcPropertyMapper();
 
+    /** Default Constructor. */
+    public JdbcPropertyStore() {}
+    
     /**
      * Constructor from DataSource.
      * 
@@ -71,156 +85,194 @@ public class JdbcPropertyStore extends AbstractPropertyStore implements  JdbcSto
     }
      
     /** {@inheritDoc} */
-    @Override
-    public boolean exist(String name) {
+    public boolean existProperty(String name) {
         Util.assertHasLength(name);
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        PreparedStatement  ps = null;
+        ResultSet          rs = null;
+        Connection         sqlConn = null;
         try {
-            ps = buildStatement(SQL_PROPERTY_EXIST, name);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                return 1 == rs.getInt(1);
-            }
-            return false;
+           sqlConn = getDataSource().getConnection();
+           ps = buildStatement(sqlConn, getQueryBuilder().existProperty(), name);
+           rs = ps.executeQuery();
+           rs.next();
+           return 1 == rs.getInt(1);
         } catch (SQLException sqlEX) {
-            throw new FeatureAccessException("Cannot check feature existence, error related to database", sqlEX);
+           throw new PropertyAccessException("Cannot check feature existence, error related to database", sqlEX);
         } finally {
             closeResultSet(rs);
             closeStatement(ps);
+            closeConnection(sqlConn);
         }
     }
 
     /** {@inheritDoc} */
-    @Override
-    public <T> void create(AbstractProperty<T> ap) {
-        if (ap == null) {
-            throw new IllegalArgumentException("Property cannot be null nor empty");
-        }
-        if (exist(ap.getName())) {
-            throw new PropertyAlreadyExistException(ap.getName());
-        }
+    public <T> void createProperty(Property<T> ap) {
+        Util.assertNotNull(ap);
+        Connection sqlConn = null;
         PreparedStatement ps = null;
         try {
-            Connection sqlConn = getDataSource().getConnection();
-            ps = sqlConn.prepareStatement(SQL_PROPERTY_CREATE);
+            sqlConn = getDataSource().getConnection();
+            if (existProperty(ap.getName())) {
+                throw new PropertyAlreadyExistException(ap.getName());
+            }
+            ps = sqlConn.prepareStatement(getQueryBuilder().createProperty());
             ps.setString(1, ap.getName());
             ps.setString(2, ap.getType());
             ps.setString(3, ap.asString());
-            if (ap.getFixedValues() != null && ap.getFixedValues().size() > 0) {
+            ps.setString(4, ap.getDescription());
+            if (ap.getFixedValues() != null && !ap.getFixedValues().isEmpty()) {
                 String fixedValues = ap.getFixedValues().toString();
-                ps.setString(4, fixedValues.substring(1, fixedValues.length() - 1));
+                ps.setString(5, fixedValues.substring(1, fixedValues.length() - 1));
             } else {
-                ps.setString(4, null);
+                ps.setString(5, null);
             }
             ps.executeUpdate();
         } catch (SQLException sqlEX) {
-            throw new FeatureAccessException("Cannot update properties database, SQL ERROR", sqlEX);
+            throw new PropertyAccessException("Cannot update properties database, SQL ERROR", sqlEX);
         } finally {
             // Connection is closed alse here within clos statement
             closeStatement(ps);
+            closeConnection(sqlConn);
         }
     }
 
     /** {@inheritDoc} */
-    @Override
-    public AbstractProperty<?> read(String name) {
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+    public Property<?> readProperty(String name) {
         Util.assertHasLength(name);
-        
+        Connection   sqlConn = null;
+        PreparedStatement ps = null;
+        ResultSet         rs = null;
         try {
-            // Returns features
-            ps = buildStatement(SQL_PROPERTY_READ, name);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                return JDBC_MAPPER.map(rs);
-            } else {
+            sqlConn = getDataSource().getConnection();
+            if (!existProperty(name)) {
                 throw new PropertyNotFoundException(name);
             }
+            // Returns features
+            ps = buildStatement(sqlConn, getQueryBuilder().getProperty(), name);
+            rs = ps.executeQuery();
+            rs.next();
+            return JDBC_MAPPER.map(rs);
         } catch (SQLException sqlEX) {
-            throw new FeatureAccessException("Cannot check property existence, error related to database", sqlEX);
+            throw new PropertyAccessException("Cannot check property existence, error related to database", sqlEX);
         } finally {
             closeResultSet(rs);
             closeStatement(ps);
+            closeConnection(sqlConn);
         }
     }
 
     /** {@inheritDoc} */
-    @Override
-    public void update(String name, String newValue) {
+    public void updateProperty(String name, String newValue) {
         Util.assertHasLength(name);
-        if (!exist(name)) {
-            throw new PropertyNotFoundException(name);
-        }
-        // Update
-        AbstractProperty<?> current = read(name);
-        current.setValueFromString(newValue);
-        //
+        Connection   sqlConn = null;
         PreparedStatement ps = null;
         try {
-            ps = buildStatement(SQL_PROPERTY_UPDATE, newValue, name);
+            sqlConn = getDataSource().getConnection();
+            // Check existence
+            Property<?> ab = readProperty(name);
+            // Check new value validity
+            ab.fromString(newValue);
+            ps = buildStatement(sqlConn, getQueryBuilder().updateProperty(), newValue, name);
             ps.executeUpdate();
         } catch (SQLException sqlEX) {
-            throw new FeatureAccessException("Cannot update property database, SQL ERROR", sqlEX);
+            throw new PropertyAccessException("Cannot update property database, SQL ERROR", sqlEX);
         } finally {
             closeStatement(ps);
+            closeConnection(sqlConn);
         }
     }
 
     /** {@inheritDoc} */
-    @Override
-    public <T> void update(AbstractProperty<T> prop) {
+    public <T> void updateProperty(Property<T> prop) {
         if (prop == null || prop.getName() == null) {
             throw new IllegalArgumentException("Cannot update property, please provide property name");
         }
-        // Delete
-        delete(prop.getName());
-        // Create
-        create(prop);
+        deleteProperty(prop.getName());
+        createProperty(prop);
     }
-
+   
     /** {@inheritDoc} */
-    @Override
-    public void delete(String name) {
-        if (name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("Property identifier (param#0) cannot be null nor empty");
-        }
-        if (!exist(name)) {
-            throw new PropertyNotFoundException(name);
-        }
+    public void deleteProperty(String name) {
+        Util.assertHasLength(name);
+        Connection   sqlConn = null;
         PreparedStatement ps = null;
         try {
-            ps = buildStatement(SQL_PROPERTY_DELETE,name);
+            sqlConn = getDataSource().getConnection();
+            if (!existProperty(name)) {
+                throw new PropertyNotFoundException(name);
+            }
+            ps = buildStatement(sqlConn, getQueryBuilder().deleteProperty(), name);
             ps.executeUpdate();
         } catch (SQLException sqlEX) {
-            throw new FeatureAccessException("Cannot delete property database, SQL ERROR", sqlEX);
+            throw new PropertyAccessException("Cannot delete property database, SQL ERROR", sqlEX);
         } finally {
             closeStatement(ps);
+            closeConnection(sqlConn);
         }
     }
     
     /** {@inheritDoc} */
     @Override
-    public Map<String, AbstractProperty<?>> readAllProperties() {
-        Map<String, AbstractProperty<?>> properties = new LinkedHashMap<String, AbstractProperty<?>>();
+    public Map<String, Property<?>> readAllProperties() {
+        Map<String, Property<?>> properties = new LinkedHashMap<String, Property<?>>();
+        Connection   sqlConn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
         try {
-            ps = buildStatement(SQL_PROPERTY_READ);
+            sqlConn = getDataSource().getConnection();
+            ps = buildStatement(sqlConn, getQueryBuilder().getAllProperties());
             rs = ps.executeQuery();
             while (rs.next()) {
-                AbstractProperty<?> ap = JDBC_MAPPER.map(rs);
+                Property<?> ap = JDBC_MAPPER.map(rs);
                 properties.put(ap.getName(),ap);
             }
-            ps.executeUpdate();
         } catch (SQLException sqlEX) {
-            throw new FeatureAccessException("Cannot read properties within database, SQL ERROR", sqlEX);
+            throw new PropertyAccessException("Cannot read properties within database, SQL ERROR", sqlEX);
         } finally {
             closeResultSet(rs);
             closeStatement(ps);
+            closeConnection(sqlConn);
         }
         return properties;
+    }
+    
+    /** {@inheritDoc} */
+    public Set<String> listPropertyNames() {
+        Set < String > propertyNames = new HashSet<String>();
+        PreparedStatement ps = null;
+        Connection   sqlConn = null;
+        ResultSet rs = null;
+        try {
+            sqlConn = getDataSource().getConnection();
+            ps = buildStatement(sqlConn, getQueryBuilder().getAllPropertiesNames());
+            rs = ps.executeQuery();
+            while (rs.next()) {
+               propertyNames.add(rs.getString(COL_PROPERTY_ID));
+            }
+        } catch (SQLException sqlEX) {
+            throw new PropertyAccessException("Cannot read properties within database, SQL ERROR", sqlEX);
+        } finally {
+            closeResultSet(rs);
+            closeStatement(ps);
+            closeConnection(sqlConn);
+        }
+        return propertyNames;
+    }
+
+    /** {@inheritDoc} */
+    public void clear() {
+        PreparedStatement ps = null;
+        Connection   sqlConn = null;
+        try {
+            sqlConn = getDataSource().getConnection();
+            ps = buildStatement(sqlConn, getQueryBuilder().deleteAllProperties());
+            ps.executeUpdate();
+        } catch (SQLException sqlEX) {
+            throw new PropertyAccessException("Cannot clear properties table, SQL ERROR", sqlEX);
+        } finally {
+            closeStatement(ps);
+            closeConnection(sqlConn);
+        }
     }
 
     /**
@@ -242,61 +294,21 @@ public class JdbcPropertyStore extends AbstractPropertyStore implements  JdbcSto
         this.dataSource = dataSource;
     }
     
-    /**
-     * Build {@link PreparedStatement} from parameters
-     * 
-     * @param query
-     *            query template
-     * @param params
-     *            current parameters
-     * @return working {@link PreparedStatement}
-     * @throws SQLException
-     *             sql error when working with statement
-     */
-    public PreparedStatement buildStatement(String query, String... params) throws SQLException {
-        Connection sqlConn = getDataSource().getConnection();
-        PreparedStatement ps = sqlConn.prepareStatement(query);
-        if (params != null && params.length > 0) {
-            for (int i = 0; i < params.length; i++) {
-                ps.setString(i + 1, params[i]);
-            }
-        }
-        return ps;
-    }
+	/**
+	 * @return the queryBuilder
+	 */
+	public JdbcQueryBuilder getQueryBuilder() {
+		if (queryBuilder == null) {
+			queryBuilder = new JdbcQueryBuilder();
+		}
+		return queryBuilder;
+	}
+
+	/**
+	 * @param queryBuilder the queryBuilder to set
+	 */
+	public void setQueryBuilder(JdbcQueryBuilder queryBuilder) {
+		this.queryBuilder = queryBuilder;
+	}
     
-    /**
-     * Close resultset.
-     * 
-     * @param rs
-     *            target resultset
-     */
-    private void closeResultSet(ResultSet rs) {
-        try {
-            if (rs != null) {
-                rs.close();
-            }
-        } catch (SQLException e) {
-            throw new FeatureAccessException("An error occur when closing resultset", e);
-        }
-    }
-
-    /**
-     * Utility method to close statement properly.
-     * 
-     * @param ps
-     * 
-     */
-    private void closeStatement(PreparedStatement ps) {
-        try {
-            if (ps != null && !ps.isClosed()) {
-                 if (ps.getConnection() != null && !ps.getConnection().isClosed()) {
-                     ps.getConnection().close();
-                 }
-                 ps.close();
-            }
-        } catch (SQLException e) {
-            throw new FeatureAccessException("An error occur when closing statement", e);
-        }
-    }
-
 }

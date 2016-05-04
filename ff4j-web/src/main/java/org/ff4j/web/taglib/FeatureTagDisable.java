@@ -24,7 +24,6 @@ import java.util.Map;
 
 import javax.servlet.jsp.PageContext;
 
-import org.apache.commons.lang.StringUtils;
 import org.ff4j.FF4j;
 import org.ff4j.core.FlippingExecutionContext;
 
@@ -37,22 +36,26 @@ public class FeatureTagDisable extends AbstractFeatureTag {
 
     /** serial. */
     private static final long serialVersionUID = 2699259876617318061L;
-
-    /**
-     * Default constructor.
-     */
-    public FeatureTagDisable() {}
-
+  
     /** {@inheritDoc} */
-    @Override
     protected boolean eval(FF4j ff4j, PageContext jspContext) {
         FlippingExecutionContext executionContext = new FlippingExecutionContext();
-        executionContext.putString("LOCALE", pageContext.getRequest().getLocalName());
-        
-        @SuppressWarnings("unchecked")
-        Map < String, String[]> parameters = pageContext.getRequest().getParameterMap();
-        for (String param : parameters.keySet()) {
-            executionContext.putString(param, StringUtils.join(parameters.get(param), ","));
+        if (isShareHttpSession()) {
+            executionContext.putString("LOCALE", pageContext.getRequest().getLocalName());
+            @SuppressWarnings("unchecked")
+            Map < String, String[]> parameters = pageContext.getRequest().getParameterMap();
+            for (Map.Entry<String,String[]> param : parameters.entrySet()) {
+                String[] innerParams = param.getValue();
+                if (innerParams != null) {
+                    StringBuilder sb = new StringBuilder();
+                    for (String innerParam : innerParams) {
+                        sb.append(innerParam);
+                        sb.append(",");
+                    }
+                    String expression = sb.toString();
+                    executionContext.putString(param.getKey(), expression.substring(0, expression.length() - 1));
+                }
+            }
         }
         return !ff4j.check(getFeatureid(), executionContext);
     }

@@ -26,7 +26,7 @@ import java.util.Set;
 /**
  * Repository to persist {@link Feature}(s)
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public interface FeatureStore {
 
@@ -165,20 +165,11 @@ public interface FeatureStore {
      * @return set of group in the store
      */
     Set<String> readAllGroups();
-
+    
     /**
-     * Implementation of Store to get cache.
-     *
-     * @return target store
+     * Empty features set.
      */
-    boolean isCached();
+    void clear();
 
-    /**
-     * Return false.
-     * @return
-     */
-    String getCacheProvider();
-
-    String getCachedTargetStore();
-
+    
 }

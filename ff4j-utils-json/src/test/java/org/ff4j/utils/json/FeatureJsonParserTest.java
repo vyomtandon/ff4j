@@ -21,13 +21,18 @@ package org.ff4j.utils.json;
  */
 
 import java.io.ByteArrayOutputStream;
+import java.util.HashMap;
 import java.util.Map;
 
-import org.codehaus.jackson.map.ObjectMapper;
 import org.ff4j.FF4j;
 import org.ff4j.core.Feature;
+import org.ff4j.property.Property;
+import org.ff4j.property.util.PropertyJsonBean;
+import org.ff4j.utils.Util;
 import org.junit.Assert;
 import org.junit.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FeatureJsonParserTest {
   
@@ -62,6 +67,49 @@ public class FeatureJsonParserTest {
         Assert.assertEquals(ff4j.getFeatures().size(), ff.length);
     }
     
+    @Test
+    public void testInit() throws Exception {
+        Assert.assertNotNull(Util.instanciatePrivate(FeatureJsonParser.class));
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidJsonGetIllegalArgument() {
+        FeatureJsonParser.parseFeature("something:invald");
+    }
+    
+    @Test
+    public void testSerialisation() {
+        Feature[] features = { new Feature("f1"), new Feature("f2")};
+        Assert.assertNotNull(FeatureJsonParser.featureArrayToJson(features));
+        Assert.assertNotNull(FeatureJsonParser.featureArrayToJson(null));
+    }
+    
+    @Test
+    public void testParseFlipStrategyAsJson() {
+        Assert.assertNull(FeatureJsonParser.parseFlipStrategyAsJson("f1", ""));
+        Assert.assertNull(FeatureJsonParser.parseFlipStrategyAsJson("f1", null));
+        String fExp = "{\"initParams\":{\"weight\":\"0.6\"},\"type\":\"org.ff4j.strategy.PonderationStrategy\"}";
+        Assert.assertNotNull(FeatureJsonParser.parseFlipStrategyAsJson("f1", fExp));
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testParseFlipStrategyAsJsonError() {
+        FeatureJsonParser.parseFlipStrategyAsJson("f1", "something:invalid");
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testparseFeatureArrayError() {
+        FeatureJsonParser.parseFeatureArray("something:invalid");
+    }
+    
+    
+    @Test
+    public void testparseFeatureArrayEmpty() {
+        Assert.assertNull(FeatureJsonParser.parseFeatureArray(null));
+        Assert.assertNull(FeatureJsonParser.parseFeatureArray(""));
+    }
+    
+    
     /**
      * Check cutom (fast) serialization against Jackson.
      * 
@@ -72,6 +120,21 @@ public class FeatureJsonParserTest {
      *             error occured
      */
     private String marshallWithJackson(Feature f) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        mapper.writeValue(baos, f);
+        return new StringBuilder().append(baos).toString();
+    }
+    
+    /**
+     * Check cutom (fast) serialization against Jackson.
+     * 
+     * @param f
+     *            current feature
+     * @return feature serialized as JSON
+     * @throws Exception
+     *             error occured
+     */
+    private String marshallWithJackson(PropertyJsonBean f) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         mapper.writeValue(baos, f);
         return new StringBuilder().append(baos).toString();
@@ -101,8 +164,16 @@ public class FeatureJsonParserTest {
      *            feature
      **/
     private void assertMarshalling(Feature feat) throws Exception {
+        Map < String, Property<?>> props = feat.getCustomProperties();
+        if (props != null && !props.isEmpty()) {
+            // Custom properties are unforce to PropertyJsonBean
+            for (String pName : props.keySet()) {
+                PropertyJsonBean pjb = new PropertyJsonBean(props.get(pName));
+                Assert.assertEquals(marshallWithJackson(pjb), pjb.asJson());
+            }
+            feat.setCustomProperties(new HashMap<String, Property<?>>());
+        } 
         Assert.assertEquals(marshallWithJackson(feat), feat.toJson());
-        Assert.assertEquals(ff4j.getFeatures().get(feat.getUid()).toJson(), feat.toJson());
-    }   
-
+        feat.setCustomProperties(props);
+    }
 }

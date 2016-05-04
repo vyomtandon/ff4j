@@ -20,10 +20,12 @@ package org.ff4j.aop;
  * #L%
  */
 
-import org.junit.Assert;
-
 import org.ff4j.FF4j;
+import org.ff4j.aop.test.exception.ApplicationException;
+import org.ff4j.aop.test.goodbye.GoodbyeService;
+import org.ff4j.aop.test.greeting.GreetingService;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -32,6 +34,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import java.lang.reflect.InvocationTargetException;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration("classpath:applicationContext-ff4j-aop-test.xml")
@@ -51,10 +55,10 @@ public class FeatureAdvisorTest {
     @Before
     public void createFeatures() {
         if (!ff4j.exist("language-english")) {
-            ff4j.create("language-english");
+            ff4j.createFeature("language-english");
         }
         if (!ff4j.exist("language-french")) {
-            ff4j.create("language-french");
+            ff4j.createFeature("language-french");
         }
     }
 
@@ -65,7 +69,7 @@ public class FeatureAdvisorTest {
     }
 
     @Test
-    public void testAnnotatedFlipping_with_alterBean() {
+    public void testAnnotatedFlippingwithalterBean() {
         ff4j.disable("language-french");
         Assert.assertTrue(greeting.sayHello("CLU").startsWith("Hello"));
 
@@ -75,14 +79,14 @@ public class FeatureAdvisorTest {
 
     @Test
     @Ignore
-    public void testAnnotatedFlipping_with_alterClazz() {
+    public void testAnnotatedFlippingwithalterClazz() {
         Assert.assertTrue(greeting.sayHelloWithClass("CLU").startsWith("Hi"));
         ff4j.enable("language-french");
         Assert.assertTrue("Service did not flipped", greeting.sayHelloWithClass("CLU").startsWith("Salut"));
     }
 
     @Test
-    public void testAnnotatedFlipping_if_qualified_implementation_is_not_the_first_class_qualified_name_in_natural_ordering() {
+    public void testAnnotatedFlippingifqualifiedimplementationisnotthefirstclassqualifiednameinnaturalordering() {
         Assert.assertTrue(goodbye.sayGoodbye("CLU").startsWith("Au revoir"));
 
         ff4j.enable("language-english");
@@ -91,10 +95,38 @@ public class FeatureAdvisorTest {
 
     @Test
     @Ignore
-    public void testAnnotatedFlipping_with_alterClazz_if_qualified_implementation_is_not_the_first_class_qualified_name_in_natural_ordering() {
+    public void testAnnotatedFlippingwithalterClazzifqualifiedimplementationisnotthefirstclassqualifiednameinnaturalordering() {
         Assert.assertTrue(goodbye.sayGoodbyeWithClass("CLU").startsWith("A plus"));
 
         ff4j.enable("language-english");
         Assert.assertTrue("Service did not flipped", goodbye.sayGoodbyeWithClass("CLU").startsWith("See you"));
+    }
+
+    @Test(expected = ApplicationException.class)
+    public void testAlterBeanInvokeThrowApplicationException() {
+        ff4j.disableAlterBeanThrowInvocationTargetException();
+        ff4j.enable("language-english");
+        goodbye.sayGoodbyeThrowException();
+    }
+
+    @Test(expected = ApplicationException.class)
+    public void testAlterClazzInvokeThrowApplicationException() {
+        ff4j.disableAlterBeanThrowInvocationTargetException();
+        ff4j.enable("language-english");
+        goodbye.sayGoodbyeWithClassThrowException();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAlterBeanInvokeThrowInvocationTargetExceptionNull() throws Exception {
+        ff4j.enableAlterBeanThrowInvocationTargetException();
+        ff4j.enable("language-english");
+        goodbye.sayGoodbyeInvocationTargetExceptionNull();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAlterClazzInvokeThrowInvocationTargetExceptionNull() throws InvocationTargetException {
+        ff4j.enableAlterBeanThrowInvocationTargetException();
+        ff4j.enable("language-english");
+        goodbye.sayGoodbyeWithClassInvocationTargetExceptionNull();
     }
 }

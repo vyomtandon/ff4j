@@ -18,10 +18,10 @@
   limitations under the License.
   #L%
   -->
-
+<!DOCTYPE configuration>
 <features xmlns="http://www.ff4j.org/schema/ff4j" 
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	 xsi:schemaLocation="http://www.ff4j.org/schema/ff4j http://ff4j.org/schema/ff4j-1.2.0.xsd">
+	 xsi:schemaLocation="http://www.ff4j.org/schema/ff4j ../../main/resources/ff4j-1.2.0.xsd">
 
 
 	<feature uid="sayHello" description="my first feature" enable="true">
@@ -54,7 +54,7 @@
 		</feature>
 
 		<feature uid="feat4" description="null" enable="true">
-			<flipstrategy class="org.ff4j.strategy.ReleaseDateFlipStrategy">
+			<flipstrategy class="org.ff4j.strategy.time.ReleaseDateFlipStrategy">
 				<param name="releaseDate" value="2013-07-14-14:00" />
 			</flipstrategy>
 		</feature>

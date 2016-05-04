@@ -14,7 +14,7 @@ package org.ff4j.exception;
 /**
  * Store could be parameterized to through exception when Feature not found.
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class FeatureNotFoundException extends RuntimeException {
 
@@ -29,6 +29,16 @@ public class FeatureNotFoundException extends RuntimeException {
      **/
     public FeatureNotFoundException(String featureName) {
         super(featureName + " does not exist in store");
+    }
+
+    /**
+     * Parameterized constructor.
+     * 
+     * @param featureName
+     *            feature to be processed
+     **/
+    public FeatureNotFoundException(String featureName, Throwable parentException) {
+        super(featureName + " does not exist in store", parentException);
     }
 
 }

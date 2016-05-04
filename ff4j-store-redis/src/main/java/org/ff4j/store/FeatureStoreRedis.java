@@ -30,7 +30,7 @@ import org.ff4j.core.FeatureStore;
 import org.ff4j.exception.FeatureAlreadyExistException;
 import org.ff4j.exception.FeatureNotFoundException;
 import org.ff4j.exception.GroupNotFoundException;
-import org.ff4j.redis.FF4JRedisConstants;
+import org.ff4j.redis.RedisConnection;
 import org.ff4j.utils.Util;
 import org.ff4j.utils.json.FeatureJsonParser;
 
@@ -41,25 +41,37 @@ import redis.clients.jedis.Jedis;
  *
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedisConstants {
+public class FeatureStoreRedis extends AbstractFeatureStore {
     
-    /** redis host. */
-    protected String redisHost = DEFAULT_REDIS_HOST;
-
-    /** redis port. */
-    protected int redisport = DEFAULT_REDIS_PORT;
-
+    /** prefix of keys. */
+    public static final String KEY_FEATURE = "FF4J_FEATURE_";
+    
+    /** default ttl. */
+    private static int DEFAULT_TTL = 900000000;
+    
     /** time to live. */
     protected int timeToLive = DEFAULT_TTL;
     
-    /** Java Redis CLIENT. */
-    protected Jedis jedis;
+    /** Wrapping of redis connection (isolation). */
+    private RedisConnection redisConnection;
     
     /**
      * Default Constructor.
      */
     public FeatureStoreRedis() {
-        jedis = new Jedis(redisHost, redisport);
+        this(new RedisConnection());
+    }
+    
+    /**
+     * Contact remote redis server.
+     * 
+     * @param host
+     *            target redis host
+     * @param port
+     *            target redis port
+     */
+    public FeatureStoreRedis(RedisConnection pRedisConnection) {
+        redisConnection = pRedisConnection;
     }
     
     /**
@@ -79,9 +91,20 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
      *            target redis port
      */
     public FeatureStoreRedis(String host, int port) {
-        this.redisHost = host;
-        this.redisport = port;
-        jedis = new Jedis(host, port);
+        this(new RedisConnection(host, port));
+    }
+    
+    /**
+     * Contact remote redis server.
+     * 
+     * @param host
+     *            target redis host
+     * @param port
+     *            target redis port
+     */
+    public FeatureStoreRedis(String host, int port, String password, String xmlFeaturesfFile) {
+        this(new RedisConnection(host, port, password));
+        importFeaturesFromXmlFile(xmlFeaturesfFile);
     }
 
     /**
@@ -101,7 +124,7 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
     @Override
     public boolean exist(String uid) {
         Util.assertParamNotNull(uid, "Feature identifier");
-        return jedis.exists(PREFIX_KEY + uid);
+        return getJedis().exists(KEY_FEATURE + uid);
     }
     
     /** {@inheritDoc} */
@@ -110,7 +133,7 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
         if (!exist(uid)) {
             throw new FeatureNotFoundException(uid);
         }
-        return FeatureJsonParser.parseFeature(jedis.get(PREFIX_KEY + uid));
+        return FeatureJsonParser.parseFeature(getJedis().get(KEY_FEATURE + uid));
     }
     
     /** {@inheritDoc} */
@@ -122,8 +145,8 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
         if (!exist(fp.getUid())) {
             throw new FeatureNotFoundException(fp.getUid());
         }
-        jedis.set(PREFIX_KEY + fp.getUid(), fp.toJson());
-        jedis.persist(PREFIX_KEY + fp.getUid());
+        getJedis().set(KEY_FEATURE + fp.getUid(), fp.toJson());
+        getJedis().persist(KEY_FEATURE + fp.getUid());
     }
     
     /** {@inheritDoc} */
@@ -157,18 +180,18 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
         if (exist(fp.getUid())) {
             throw new FeatureAlreadyExistException(fp.getUid());
         }
-        jedis.set(PREFIX_KEY + fp.getUid(), fp.toJson());
-        jedis.persist(PREFIX_KEY + fp.getUid());
+        getJedis().set(KEY_FEATURE + fp.getUid(), fp.toJson());
+        getJedis().persist(KEY_FEATURE + fp.getUid());
     }
 
     /** {@inheritDoc} */
     @Override
     public Map<String, Feature> readAll() {
-        Set < String > myKeys = jedis.keys(PREFIX_KEY + "*");
+        Set < String > myKeys = getJedis().keys(KEY_FEATURE + "*");
         Map<String, Feature> myMap = new HashMap<String, Feature>();
         if (myKeys != null) {
             for (String key : myKeys) {
-                key = key.replaceAll(PREFIX_KEY, "");
+                key = key.replaceAll(KEY_FEATURE, "");
                 myMap.put(key, read(key));
             }
         }
@@ -181,7 +204,7 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
         if (!exist(fpId)) {
             throw new FeatureNotFoundException(fpId);
         }
-        jedis.del(PREFIX_KEY + fpId);
+        getJedis().del(KEY_FEATURE + fpId);
     }    
 
     /** {@inheritDoc} */
@@ -213,9 +236,9 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
         Util.assertParamNotNull(groupName, "groupName");
         Map < String, Feature > features = readAll();
         Map < String, Feature > group = new HashMap<String, Feature>();
-        for (String uid : features.keySet()) {
-            if (groupName.equals(features.get(uid).getGroup())) {
-                group.put(uid, features.get(uid));
+        for (Map.Entry<String,Feature> uid : features.entrySet()) {
+            if (groupName.equals(uid.getValue().getGroup())) {
+                group.put(uid.getKey(), uid.getValue());
             }
         }
         if (group.isEmpty()) {
@@ -230,9 +253,9 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
         Util.assertParamNotNull(groupName, "groupName");
         Map < String, Feature > features = readAll();
         Map < String, Feature > group = new HashMap<String, Feature>();
-        for (String uid : features.keySet()) {
-            if (groupName.equals(features.get(uid).getGroup())) {
-                group.put(uid, features.get(uid));
+        for (Map.Entry<String,Feature> uid : features.entrySet()) {
+            if (groupName.equals(uid.getValue().getGroup())) {
+                group.put(uid.getKey(), uid.getValue());
             }
         }
         return !group.isEmpty();
@@ -242,9 +265,9 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
     @Override
     public void enableGroup(String groupName) {
         Map < String, Feature > features = readGroup(groupName);
-        for (String uid : features.keySet()) {
-            features.get(uid).enable();
-            update(features.get(uid));
+        for (Map.Entry<String,Feature> uid : features.entrySet()) {
+            uid.getValue().enable();
+            update(uid.getValue());
         }
     }
 
@@ -252,9 +275,9 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
     @Override
     public void disableGroup(String groupName) {
         Map < String, Feature > features = readGroup(groupName);
-        for (String uid : features.keySet()) {
-            features.get(uid).disable();
-            update(features.get(uid));
+        for (Map.Entry<String,Feature> uid : features.entrySet()) {
+            uid.getValue().disable();
+            update(uid.getValue());
         }
     }
 
@@ -288,31 +311,73 @@ public class FeatureStoreRedis extends AbstractFeatureStore implements FF4JRedis
     public Set<String> readAllGroups() {
         Map < String, Feature > features = readAll();
         Set < String > groups = new HashSet<String>();
-        for (String uid : features.keySet()) {
-            groups.add(features.get(uid).getGroup());
+        for (Map.Entry<String,Feature> uid : features.entrySet()) {
+            groups.add(uid.getValue().getGroup());
         }
         groups.remove(null);
         return groups;
     }
-
-    // -------- Overrided in cache proxy --------------
+    
 
     /** {@inheritDoc} */
     @Override
-    public boolean isCached() {
-        return false;
+    public void clear() {
+        Set < String > myKeys = getJedis().keys(KEY_FEATURE + "*");
+        getJedis().del(myKeys.toArray(new String[0]));
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public String getCacheProvider() {
-        return null;
+    
+    /**
+     * Getter accessor for attribute 'timeToLive'.
+     *
+     * @return
+     *       current value of 'timeToLive'
+     */
+    public int getTimeToLive() {
+        return timeToLive;
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public String getCachedTargetStore() {
-        return null;
+    /**
+     * Setter accessor for attribute 'timeToLive'.
+     * @param timeToLive
+     * 		new value for 'timeToLive '
+     */
+    public void setTimeToLive(int timeToLive) {
+        this.timeToLive = timeToLive;
+    }
+
+    /**
+     * Getter accessor for attribute 'redisConnection'.
+     *
+     * @return
+     *       current value of 'redisConnection'
+     */
+    public RedisConnection getRedisConnection() {
+        return redisConnection;
+    }
+
+    /**
+     * Setter accessor for attribute 'redisConnection'.
+     * @param redisConnection
+     * 		new value for 'redisConnection '
+     */
+    public void setRedisConnection(RedisConnection redisConnection) {
+        this.redisConnection = redisConnection;
+    }
+    
+    /**
+     * Safe acces to Jedis, avoid JNPE.
+     *
+     * @return
+     */
+    public Jedis getJedis() {
+        if (redisConnection == null) {
+            throw new IllegalArgumentException("Cannot found any redisConnection");
+        }
+        if (redisConnection.getJedis() == null) {
+            throw new IllegalArgumentException("Cannot found any jedis connection, please build connection");
+        }
+        return redisConnection.getJedis() ;
     }
     
 }

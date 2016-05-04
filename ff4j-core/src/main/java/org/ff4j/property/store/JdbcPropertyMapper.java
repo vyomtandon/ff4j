@@ -4,7 +4,7 @@ package org.ff4j.property.store;
  * #%L
  * ff4j-core
  * %%
- * Copyright (C) 2013 - 2015 Ff4J
+ * Copyright (C) 2013 - 2015 FF4J
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,23 +20,25 @@ package org.ff4j.property.store;
  * #L%
  */
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
-import org.ff4j.property.AbstractProperty;
 import org.ff4j.property.Property;
-import org.ff4j.store.JdbcStoreConstants;
+import org.ff4j.property.PropertyString;
+import org.ff4j.property.util.PropertyFactory;
+
+import static org.ff4j.store.JdbcStoreConstants.*;
 
 /**
- * Convert resultset into {@link Property}.
+ * Convert resultset into {@link PropertyString}.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class JdbcPropertyMapper implements JdbcStoreConstants {
+public class JdbcPropertyMapper {
     
     /**
      * Expect to convert a JDBC Result to Property.
@@ -46,50 +48,17 @@ public class JdbcPropertyMapper implements JdbcStoreConstants {
      *      target property
      * @throws SQLException
      */
-    public AbstractProperty<?> map(ResultSet rs) throws SQLException {
+    public Property<?> map(ResultSet rs) throws SQLException {
         String propertyName  = rs.getString(COL_PROPERTY_ID);
         String propertyValue = rs.getString(COL_PROPERTY_VALUE);
-        AbstractProperty<?> ap = new Property(propertyName, propertyValue);
-       
-        // Dedicated Type
-        String propertyType = rs.getString(COL_PROPERTY_TYPE);
-        if (propertyType != null) {
-            try {
-                // Construction by dedicated constructor with introspection
-                Constructor<?> constr = Class.forName(propertyType).getConstructor(String.class, String.class);
-                ap = (AbstractProperty<?>) constr.newInstance(propertyName, propertyValue);
-            } catch (InstantiationException e) {
-                throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' check default constructor", e);
-            } catch (IllegalAccessException e) {
-                throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' check visibility", e);
-            } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' not found", e);
-            } catch (InvocationTargetException e) {
-                throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "'  erro within constructor", e);
-            } catch (NoSuchMethodException e) {
-                throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' constructor not found", e);
-            } catch (SecurityException e) {
-                throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' check constructor visibility", e);
-            }
+        String propertyType  = rs.getString(COL_PROPERTY_TYPE);
+        String description   = rs.getString(COL_PROPERTY_DESCRIPTION);
+        String fixedValues   = rs.getString(COL_PROPERTY_FIXED);
+        Set < String > value = null;
+        if (fixedValues != null) {
+            value = new HashSet<String>(Arrays.asList(fixedValues.split(",")));
         }
-        
-        // Is there any fixed Value ?
-        String fixedValues = rs.getString(COL_PROPERTY_FIXED);
-        if (fixedValues != null && !"".equals(fixedValues)) {
-            List<String> listOfFixedValue = Arrays.asList(fixedValues.split(","));
-            if (listOfFixedValue != null) {
-                for (String v : listOfFixedValue) {
-                    ap.add2FixedValueFromString(v.trim());
-                }
-                // Check fixed value
-                if (ap.getFixedValues() != null && !ap.getFixedValues().contains(ap.getValue())) {
-                    throw new IllegalArgumentException("Cannot create property <" + ap.getName() + "> invalid value <"
-                            + ap.getValue() + "> expected one of " + ap.getFixedValues());
-                }
-            }
-        }
-        return ap;
+        return PropertyFactory.createProperty(propertyName, propertyType, propertyValue, description, value);
     }
-    
     
 }

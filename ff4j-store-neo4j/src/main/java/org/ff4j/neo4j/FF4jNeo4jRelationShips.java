@@ -29,12 +29,12 @@ import org.neo4j.graphdb.RelationshipType;
  */
 public enum FF4jNeo4jRelationShips implements RelationshipType {
     
-    /** member. */
+    /** Node FlippingStrategy with nodes Features. */
+    STRATEGY_OF,
+    
+    /** Reference from Feature to featureGroup. */
     MEMBER_OF,
     
-    /** required. */
-    REQUIRED_ROLE,
-    
-    /** USE. */
-    REQUIRED_STRATEGY;
+    /** Reference from property to feature. */
+    PROPERTY_OF;
 }

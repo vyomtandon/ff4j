@@ -23,22 +23,22 @@ package org.ff4j.property.store;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.ff4j.conf.XmlParser;
 import org.ff4j.exception.PropertyAlreadyExistException;
-import org.ff4j.exception.PropertyNotFoundException;
-import org.ff4j.property.AbstractProperty;
+import org.ff4j.property.Property;
 import org.ff4j.utils.Util;
 
 /**
  * Implementation of {@link PropertyStore} to keep properties in memory.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class InMemoryPropertyStore extends AbstractPropertyStore {
 
     /** InMemory Feature Map */
-    private Map<String, AbstractProperty<?>> properties = new LinkedHashMap<String, AbstractProperty<?>>();
+    private Map<String, Property<?>> properties = new LinkedHashMap<String, Property<?>>();
 
     /** FileName used to retrieve properties. */
     private String fileName;
@@ -78,7 +78,7 @@ public class InMemoryPropertyStore extends AbstractPropertyStore {
      * 
      * @param maps
      */
-    public InMemoryPropertyStore(Map<String, AbstractProperty<?>> maps) {
+    public InMemoryPropertyStore(Map<String, Property<?>> maps) {
         this.properties = maps;
     }
     
@@ -108,19 +108,19 @@ public class InMemoryPropertyStore extends AbstractPropertyStore {
     
     /** {@inheritDoc} */
     @Override
-    public boolean exist(String name) {
+    public boolean existProperty(String name) {
         Util.assertHasLength(name);
         return properties.containsKey(name);
     }
     
     /** {@inheritDoc} */
     @Override
-    public <T> void create(AbstractProperty<T> value) {
+    public <T> void createProperty(Property<T> value) {
         // Check Params
         Util.assertNotNull(value);
         Util.assertHasLength(value.getName());
         // Check value
-        if (exist(value.getName())) {
+        if (existProperty(value.getName())) {
             throw new PropertyAlreadyExistException(value.getName());
         }
         // Create
@@ -129,53 +129,39 @@ public class InMemoryPropertyStore extends AbstractPropertyStore {
 
     /** {@inheritDoc} */
     @Override
-    public AbstractProperty<?> read(String name) {
-        Util.assertHasLength(name);
-        if (!properties.containsKey(name)) {
-            throw new PropertyNotFoundException(name);
-        }
+    public Property<?> readProperty(String name) {
+        assertPropertyName(name);
         return properties.get(name);
     }
-
-    /** {@inheritDoc} */
-    @Override
-    public <T> void update(AbstractProperty<T> newValue) {
-        Util.assertNotNull(newValue);
-        Util.assertHasLength(newValue.getName());
-        if (!exist(newValue.getName())) {
-            throw new PropertyNotFoundException(newValue.getName());
-        }
-        // Update
-        properties.put(newValue.getName(), newValue);
-    }
     
     /** {@inheritDoc} */
     @Override
-    public void update(String name, String newValue) {
-        Util.assertHasLength(name);
-        Util.assertHasLength(newValue);
-        if (!exist(name)) {
-            throw new PropertyNotFoundException(name);
-        }
-        // Update
-        AbstractProperty<?> current = read(name);
-        current.setValueFromString(newValue);
-    } 
-    
-    /** {@inheritDoc} */
-    @Override
-    public void delete(String name) {
-        Util.assertHasLength(name);
-        if (!properties.containsKey(name)) {
-            throw new PropertyNotFoundException(name);
-        }
+    public void deleteProperty(String name) {
+        assertPropertyName(name);
         // Delete
         properties.remove(name);
     }
     
     /** {@inheritDoc} */
     @Override
-    public Map<String, AbstractProperty<?>> readAllProperties() {
+    public Set<String> listPropertyNames() {
+        if (properties == null) {
+             return null;
+        }
+        return properties.keySet();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void clear() {
+        if (properties != null) {
+            properties.clear();
+        }
+    }
+    
+    /** {@inheritDoc} */
+    @Override
+    public Map<String, Property<?>> readAllProperties() {
        return properties;
     }
 
@@ -184,8 +170,18 @@ public class InMemoryPropertyStore extends AbstractPropertyStore {
      * @param properties
      * 		new value for 'properties '
      */
-    public void setProperties(Map<String, AbstractProperty<?>> properties) {
+    public void setProperties(Map<String, Property<?>> properties) {
         this.properties = properties;
+    }
+    
+    /**
+     * Setter accessor for attribute 'locations'.
+     * 
+     * @param locations
+     *            new value for 'locations '
+     */
+    public void setLocation(String locations) {
+        loadConfFile(locations);
     }
 
     /**
@@ -206,9 +202,5 @@ public class InMemoryPropertyStore extends AbstractPropertyStore {
     public void setFileName(String fileName) {
         this.fileName = fileName;
     }
-
-    
-
-      
 
 }

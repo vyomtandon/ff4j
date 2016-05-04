@@ -20,12 +20,12 @@ import org.junit.Test;
  * 
  * @author clunven
  */
-public class InMemoryFeatureStoreTest extends AbstractStoreJUnitTest {
+public class InMemoryFeatureStoreTest extends FeatureStoreTestSupport {
 
     /** {@inheritDoc} */
     @Override
     public FeatureStore initStore() {
-        return defaultStore;
+        return  new InMemoryFeatureStore("test-ff4j-features.xml");
     }
 
     /**
@@ -36,6 +36,16 @@ public class InMemoryFeatureStoreTest extends AbstractStoreJUnitTest {
         // Given
         // 'invalid.xml' file does not exist.
         new InMemoryFeatureStore("invalid.xml");
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testWithInvalidFileFailed() {
+        new InMemoryFeatureStore("");
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testWithInvalidFileFailed2() {
+        new InMemoryFeatureStore((String) null);
     }
 
 }

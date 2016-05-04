@@ -26,12 +26,14 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.DBObject;
 
+import static org.ff4j.store.mongodb.FeatureStoreMongoConstants.*;
+
 /**
  * Mongo object builder.
  * 
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public final class FeatureDBObjectBuilder implements FeatureStoreMongoConstants {
+public final class FeatureDBObjectBuilder {
    
     /**
      * Default builder for adds.
@@ -131,6 +133,30 @@ public final class FeatureDBObjectBuilder implements FeatureStoreMongoConstants 
      */
     public FeatureDBObjectBuilder addStrategy(String value) {
         builder.add(STRATEGY, value);
+        return this;
+    }
+    
+    /**
+     * Mongo internal object representing attribute 'strategy'.
+     *
+     * @param value
+     *      target value
+     * @return
+     *      internal mong object
+     */
+    public DBObject getCustomProperties(String value) {
+        return new BasicDBObjectBuilder().add(CUSTOMPROPERTIES, value).get();
+    }
+
+    /**
+     * Chain add to build object.
+     * 
+     * @param value
+     *            target value
+     * @return
+     */
+    public FeatureDBObjectBuilder addCustomProperties(String value) {
+        builder.add(CUSTOMPROPERTIES, value);
         return this;
     }
     

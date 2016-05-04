@@ -27,12 +27,15 @@ import org.ff4j.audit.repository.EventRepository;
 /**
  * Worker to save {@link Event} into {@link EventRepository} asynchronously.
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class EventWorker implements Callable<Boolean> {
 
     /** Target event to insert. */
     private Event event = null;
+    
+    /** current thread name if relevant. */
+    private String name = null;
 
     /** Repository to store event. */
     private EventRepository eventRepository = null;
@@ -54,6 +57,9 @@ public class EventWorker implements Callable<Boolean> {
     public EventWorker(Event e, EventRepository repo) {
         this.event = e;
         this.eventRepository = repo;
+        if (e != null) {
+            this.name = e.getTimestamp() + "-" + e.getAction() + "-" + e.getName();
+        }
     }
 
     /** {@inheritDoc} */
@@ -69,6 +75,25 @@ public class EventWorker implements Callable<Boolean> {
             }
         }
         return ok;
+    }
+
+    /**
+     * Getter accessor for attribute 'name'.
+     *
+     * @return
+     *       current value of 'name'
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Setter accessor for attribute 'name'.
+     * @param name
+     * 		new value for 'name '
+     */
+    public void setName(String name) {
+        this.name = name;
     }
 
 }

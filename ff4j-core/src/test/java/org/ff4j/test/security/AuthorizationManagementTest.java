@@ -27,7 +27,9 @@ import org.ff4j.FF4j;
 import org.ff4j.core.Feature;
 import org.ff4j.security.AuthorizationsManager;
 import org.ff4j.test.AbstractFf4jTest;
+import org.junit.Assert;
 import org.junit.Test;
+
 
 /**
  * Class to test component {@link AuthorizationsManager}
@@ -47,22 +49,33 @@ public class AuthorizationManagementTest extends AbstractFf4jTest {
     @Test
     public void testAllowed() throws IOException {
         Feature ok = new Feature("ok", true, "Full1", "GRP1", Arrays.asList(new String[] {"ROLEA"}));
-        ff4j.create(ok);
+        ff4j.createFeature(ok);
         assertFf4j.assertThatCurrentUserIsAllowedOnFeature(ok.getUid());
     }
 
     @Test
     public void testNotAllowed() {
         Feature ko = new Feature("ko", true, "Full2", "GRP2", Arrays.asList(new String[] {"ROLEC"}));
-        ff4j.create(ko);
+        ff4j.createFeature(ko);
         assertFf4j.assertThatCurrentUserIsNotAllowedOnFeature(ko.getUid());
     }
 
     @Test
     public void testAllowedNoManager() throws IOException {
-        ff4j.create("new", true);
+        ff4j.createFeature("new", true);
         ff4j.setAuthorizationsManager(null);
         assertFf4j.assertThatCurrentUserIsAllowedOnFeature("new");
+    }
+    
+    @Test
+    public void testToJson() {
+        // Given
+        Assert.assertNotNull(ff4j);
+        Assert.assertNotNull(ff4j.getAuthorizationsManager());
+        // When
+        String jsonExpr = ff4j.getAuthorizationsManager().toJson();
+        // Then
+        Assert.assertNotNull(jsonExpr);
     }
 
 }

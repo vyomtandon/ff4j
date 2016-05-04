@@ -26,6 +26,7 @@ import javax.lang.model.type.NullType;
  * By annotating the target method the advisor could intercept method call and subsitute with alter class or mock class.
  * 
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author <a href="https://github.com/ghostd">Vincent Ricard</a>
  */
 @Inherited
 @Target({ElementType.METHOD, ElementType.TYPE})
@@ -45,6 +46,13 @@ public @interface Flip {
      * @return target Flipping Strategy
      */
     Class<?> strategy() default NullType.class;
+
+    /**
+     * Location of the flipping execution context.
+     *
+     * @return flippinf execution context location
+     */
+    ContextLocation contextLocation() default ContextLocation.NONE;
 
     /**
      * Set implementation clazz to be used.

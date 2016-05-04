@@ -1,5 +1,9 @@
 package org.ff4j;
 
+import static org.ff4j.audit.EventConstants.ACTION_CHECK_OFF;
+import static org.ff4j.audit.EventConstants.ACTION_CHECK_OK;
+import static org.ff4j.audit.EventConstants.SOURCE_JAVA;
+
 /*
  * #%L
  * ff4j-core
@@ -22,11 +26,14 @@ package org.ff4j;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.Set;
 
+import org.ff4j.audit.EventBuilder;
 import org.ff4j.audit.EventPublisher;
-import org.ff4j.audit.EventType;
+import org.ff4j.audit.proxy.FeatureStoreAuditProxy;
+import org.ff4j.audit.proxy.PropertyStoreAuditProxy;
 import org.ff4j.audit.repository.EventRepository;
 import org.ff4j.audit.repository.InMemoryEventRepository;
 import org.ff4j.conf.XmlParser;
@@ -35,13 +42,14 @@ import org.ff4j.core.FeatureStore;
 import org.ff4j.core.FlippingExecutionContext;
 import org.ff4j.core.FlippingStrategy;
 import org.ff4j.exception.FeatureNotFoundException;
+import org.ff4j.property.Property;
 import org.ff4j.property.store.InMemoryPropertyStore;
 import org.ff4j.property.store.PropertyStore;
 import org.ff4j.security.AuthorizationsManager;
 import org.ff4j.store.InMemoryFeatureStore;
 
 /**
- * Main class, it allows to work with features.
+ * Principal class stands as public api to work with FF4J.
  *
  * <ul>
  * <p>
@@ -62,10 +70,25 @@ import org.ff4j.store.InMemoryFeatureStore;
  * 
  * </ul>
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class FF4j {
 
+    /** Do not through {@link FeatureNotFoundException} exception and but feature is required. */
+    private boolean autocreate = false;
+    
+    /** Capture informations relative to audit. */
+    private boolean enableAudit = false;
+
+    /** Intialisation. */
+    private final long startTime = System.currentTimeMillis();
+
+    /** Version of ff4j. */
+    private final String version = getClass().getPackage().getImplementationVersion();
+    
+    /** Source of initialization (JAVA_API, WEBAPI, SSH, CONSOLE...). */
+    private final String source =  SOURCE_JAVA;
+    
     /** Storage to persist feature within {@link FeatureStore}. */
     private FeatureStore fstore = new InMemoryFeatureStore();
     
@@ -78,20 +101,25 @@ public class FF4j {
     /** Repository for audit event. */
     private EventRepository eventRepository = new InMemoryEventRepository();
 
-    /** Event Publisher. */
+    /** Event Publisher (threadpool, executor) to send data into {@link EventRepository} */
     private EventPublisher eventPublisher = null;
     
-    /** Do not through {@link FeatureNotFoundException} exception and but feature is required. */
-    private boolean autocreate = false;
+    private volatile boolean shutdownEventPublisher;
+    
+    /** Post Processing like audit enable. */
+    private boolean initialized = false;
 
-    /** Intialisation. */
-    private final long startTime = System.currentTimeMillis();
-
-    /** Version of ff4j. */
-    private final String version = getClass().getPackage().getImplementationVersion();
+    /** Hold flipping execution context as Thread-safe data. */
+    private ThreadLocal<FlippingExecutionContext> currentExecutionContext = new ThreadLocal<FlippingExecutionContext>();
 
     /**
-     * Default constructor to allows instanciation through IoC. The created store is an empty {@link InMemoryFeatureStore}.
+     * This attribute indicates when call the alter bean throw de {@link InvocationTargetException}
+     * or the wraps exception thrown by an invoked method or constructor
+     */
+    private boolean alterBeanThrowInvocationTargetException = true;
+    
+    /**
+     * Default constructor to allows instantiation through IoC. The created store is an empty {@link InMemoryFeatureStore}.
      */
     public FF4j() {
     }
@@ -101,6 +129,7 @@ public class FF4j {
      */
     public FF4j(String xmlFile) {
         this.fstore = new InMemoryFeatureStore(xmlFile);
+        this.pStore = new InMemoryPropertyStore(xmlFile);
     }
 
     /**
@@ -146,11 +175,30 @@ public class FF4j {
         if (flipped && fp.getFlippingStrategy() != null) {
             flipped = flipped && fp.getFlippingStrategy().evaluate(featureID, getFeatureStore(), executionContext);
         }
-
+        // Update current context
+        currentExecutionContext.set(executionContext);
+        
         // Any access is logged into audit system
-        getEventPublisher().publish(featureID, flipped);
+        publishCheck(featureID, flipped);
 
         return flipped;
+    }
+    
+    /**
+     * Send target event to audit if expected.
+     *
+     * @param uid
+     *      feature unique identifier
+     * @param checked
+     *      if the feature is checked or not
+     */
+    private void publishCheck(String uid, boolean checked) {
+        if (isEnableAudit()) {
+            getEventPublisher().publish(new EventBuilder(this)
+                        .feature(uid)
+                        .action(checked ? ACTION_CHECK_OK : ACTION_CHECK_OFF)
+                        .build());
+        }
     }
 
     /**
@@ -163,7 +211,7 @@ public class FF4j {
      * @return
      */
     public boolean checkOveridingStrategy(String featureID, FlippingStrategy strats) {
-        return checkOveridingStrategy(featureID, strats, null);
+        return checkOveridingStrategy(featureID, strats, currentExecutionContext.get());
     }
 
     /**
@@ -181,10 +229,7 @@ public class FF4j {
         if (strats != null) {
             flipped = flipped && strats.evaluate(featureID, getFeatureStore(), executionContext);
         }
-
-        // Any modification done is logged into audit system
-        getEventPublisher().publish(featureID, flipped);
-
+        publishCheck(featureID, flipped);
         return flipped;
     }
 
@@ -221,6 +266,16 @@ public class FF4j {
     public Map<String, Feature> getFeatures() {
         return getFeatureStore().readAll();
     }
+    
+    /**
+     * Return all properties from store.
+     *
+     * @return
+     * 		target property store.
+     */
+    public Map < String, Property<?>> getProperties() {
+    	return getPropertiesStore().readAllProperties();
+    }
 
     /**
      * Enable Feature.
@@ -233,11 +288,11 @@ public class FF4j {
             getFeatureStore().enable(featureID);
         } catch (FeatureNotFoundException fnfe) {
             if (this.autocreate) {
-                return create(new Feature(featureID, true));
+                getFeatureStore().create(new Feature(featureID, true));
+            } else {
+            	throw fnfe;
             }
-            throw fnfe;
         }
-        getEventPublisher().publish(featureID, EventType.ENABLE);
         return this;
     }
 
@@ -250,7 +305,6 @@ public class FF4j {
      */
     public FF4j enableGroup(String groupName) {
         getFeatureStore().enableGroup(groupName);
-        getEventPublisher().publish(groupName, EventType.ENABLE_GROUP);
         return this;
     }
 
@@ -262,51 +316,61 @@ public class FF4j {
      * @return current instance
      */
     public FF4j disableGroup(String groupName) {
-        getFeatureStore().enableGroup(groupName);
-        getEventPublisher().publish(groupName, EventType.DISABLE_GROUP);
+        getFeatureStore().disableGroup(groupName);
         return this;
     }
-
+    
     /**
      * Create new Feature.
      * 
      * @param featureID
      *            unique feature identifier.
      */
-    public FF4j create(Feature fp) {
+    public FF4j createFeature(Feature fp) {
         getFeatureStore().create(fp);
-        getEventPublisher().publish(fp.getUid(), EventType.CREATE);
         return this;
     }
-
+    
+    
     /**
-     * Create new Feature.
+     * Create new Property.
      * 
      * @param featureID
      *            unique feature identifier.
      */
-    public FF4j create(String featureName, boolean enable, String description) {
-        return create(new Feature(featureName, enable, description));
+    public FF4j createProperty(Property<?> prop) {
+        getPropertiesStore().createProperty(prop);
+        return this;
     }
-
+    
     /**
      * Create new Feature.
      * 
      * @param featureID
      *            unique feature identifier.
      */
-    public FF4j create(String featureName, boolean enable) {
-        return create(featureName, enable, "");
+    public FF4j createFeature(String featureName, boolean enable, String description) {
+        return createFeature(new Feature(featureName, enable, description));
     }
-
+    
     /**
      * Create new Feature.
      * 
      * @param featureID
      *            unique feature identifier.
      */
-    public FF4j create(String featureName) {
-        return create(featureName, false, "");
+    public FF4j createFeature(String featureName, boolean enable) {
+        return createFeature(featureName, enable, "");
+    }
+    
+    /**
+     * Create new Feature.
+     * 
+     * @param featureID
+     *            unique feature identifier.
+     */
+    public FF4j createFeature(String featureName) {
+        return createFeature(featureName, false, "");
     }
 
     /**
@@ -319,12 +383,12 @@ public class FF4j {
         try {
             getFeatureStore().disable(featureID);
         } catch (FeatureNotFoundException fnfe) {
-            if (this.autocreate) {
-                return create(new Feature(featureID, false));
-            }
-            throw fnfe;
+        	 if (this.autocreate) {
+                 getFeatureStore().create(new Feature(featureID, false));
+             } else {
+             	throw fnfe;
+             }
         }
-        getEventPublisher().publish(featureID, EventType.DISABLE);
         return this;
     }
 
@@ -382,6 +446,40 @@ public class FF4j {
         setAutocreate(flag);
         return this;
     }
+    
+    /**
+     * Enable autocreation of features when not found.
+     * 
+     * @param flag
+     *            target value for autocreate flag
+     * @return current instance
+     */
+    public FF4j autoCreate() {
+        return autoCreate(true);
+    }
+    
+    /**
+     * Enable auditing of features when not found.
+     * 
+     * @param flag
+     *            target value for autocreate flag
+     * @return current instance
+     */
+    public FF4j audit() {
+        return audit(true);
+    }
+            
+    /**
+     * Enable auditing of features when not found.
+     * 
+     * @param flag
+     *            target value for autocreate flag
+     * @return current instance
+     */
+    public FF4j audit(boolean val) {
+         setEnableAudit(val);
+         return this;
+    }
 
     /**
      * Delete feature name.
@@ -391,37 +489,56 @@ public class FF4j {
      */
     public FF4j delete(String fpId) {
         getFeatureStore().delete(fpId);
-        getEventPublisher().publish(fpId, EventType.DELETE);
+        return this;
+    }
+    
+    /**
+     * Delete new Property.
+     * 
+     * @param featureID
+     *            unique feature identifier.
+     */
+    public FF4j deleteProperty(String propertyName) {
+        getPropertiesStore().deleteProperty(propertyName);
         return this;
     }
 
     /** {@inheritDoc} */
-    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("{");
-        // Render Uptime as String "X day(s) X hours(s) X minute(s) X seconds"
         long uptime = System.currentTimeMillis() - startTime;
-        long daynumber = new Double(Math.floor(uptime / (1000 * 3600 * 24))).longValue();
-        uptime = uptime - (daynumber * 1000 * 3600 * 24);
-        long hourNumber = new Double(Math.floor(uptime / (1000 * 3600))).longValue();
-        uptime = uptime - (hourNumber * 1000 * 3600);
-        long minutenumber = new Double(Math.floor(uptime / (1000 * 60))).longValue();
-        uptime = uptime - (minutenumber * 1000 * 60);
-        long secondnumber = new Double(Math.floor(uptime / 1000)).longValue();
+        long daynumber = uptime / (1000 * 3600 * 24L);
+        uptime = uptime - daynumber * 1000 * 3600 * 24L;
+        long hourNumber = uptime / (1000 * 3600L);
+        uptime = uptime - hourNumber * 1000 * 3600L;
+        long minutenumber = uptime / (1000 * 60L);
+        uptime = uptime - minutenumber * 1000 * 60L;
+        long secondnumber = uptime / 1000L;
         sb.append("\"uptime\":\"");
         sb.append(daynumber + " day(s) ");
         sb.append(hourNumber + " hours(s) ");
         sb.append(minutenumber + " minute(s) ");
         sb.append(secondnumber + " seconds\"");
-        // <---
         sb.append(", \"autocreate\":" + isAutocreate());
         sb.append(", \"version\": \"" + version + "\"");
-        sb.append(", \"featuresStore\":");
-        sb.append(getFeatureStore() == null ? "null" : getFeatureStore().toString());
-        sb.append(", \"eventRepository\":");
-        sb.append(getEventRepository() == null ? "null" : getEventRepository().toString());
-        sb.append(", \"authorizationsManager\":");
-        sb.append(getAuthorizationsManager() == null ? "null" : getAuthorizationsManager().toString());
+        
+        // Display only if not null
+        if (getFeatureStore() != null) {
+            sb.append(", \"featuresStore\":");
+            sb.append(getFeatureStore().toString());
+        }
+        if (getPropertiesStore() != null) {
+            sb.append(", \"propertiesStore\":");
+            sb.append(getPropertiesStore().toString());
+        }
+        if (getEventRepository() != null) {
+            sb.append(", \"eventRepository\":");
+            sb.append(getEventRepository().toString());
+        }
+        if (getAuthorizationsManager() != null) {
+            sb.append(", \"authorizationsManager\":");
+            sb.append(getAuthorizationsManager().toString());
+        }
         sb.append("}");
         return sb.toString();
     }
@@ -429,38 +546,7 @@ public class FF4j {
     // -------------------------------------------------------------------------
     // ------------------- GETTERS & SETTERS -----------------------------------
     // -------------------------------------------------------------------------
-
-    /**
-     * Access store as static way (single store).
-     * 
-     * @deprecated use {@link #getFeatureStore()} instead as since 1.4 there are both Features and properties stores  
-     * @return current store
-     */
-    @Deprecated
-    public FeatureStore getStore() {
-        return fstore;
-    }
-    
-    /**
-     * Access store as static way (single store).
-     * 
-     * @return current store
-     */
-    public FeatureStore getFeatureStore() {
-        return fstore;
-    }
-
-    /**
-     * NON Static to be use by Injection of Control.
-     * 
-     * @param fbs
-     *            target store.
-     */
-    @Deprecated
-    public void setStore(FeatureStore fbs) {
-        this.fstore = fbs;
-    }
-    
+       
     /**
      * NON Static to be use by Injection of Control.
      * 
@@ -520,25 +606,97 @@ public class FF4j {
     }
 
     /**
-     * Getter accessor for attribute 'eventPublisher'.
-     * 
-     * @return current value of 'eventPublisher'
-     */
-    public EventPublisher getEventPublisher() {
-        if (eventPublisher == null) {
-            eventPublisher = new EventPublisher(eventRepository);
-        }
-        return eventPublisher;
-    }
-
-    /**
      * Setter accessor for attribute 'eventPublisher'.
-     * 
+     *
      * @param eventPublisher
      *            new value for 'eventPublisher '
      */
     public void setEventPublisher(EventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
+    }
+    
+    /**
+     * Initialization of background components.
+     */
+    private synchronized void init() {
+        
+        // Execution Context
+        FlippingExecutionContext context = new FlippingExecutionContext();
+        this.currentExecutionContext.set(context);
+        
+        // Event Publisher
+        eventPublisher = new EventPublisher(eventRepository);
+        this.shutdownEventPublisher = true;
+        
+        // Audit is enabled, proxified for auditing
+        if (isEnableAudit()) {
+        	
+        	if (fstore != null && !(fstore instanceof FeatureStoreAuditProxy)) {
+                this.fstore = new FeatureStoreAuditProxy(this, fstore);
+            }
+            if (pStore != null && !(pStore instanceof PropertyStoreAuditProxy)) { 
+                this.pStore = new PropertyStoreAuditProxy(this, pStore);
+            }
+        } else {
+        	
+        	 // Audit is disabled but could have been enabled before... removing PROXY if relevant
+        	 if (fstore != null && fstore instanceof FeatureStoreAuditProxy) {
+        		 this.fstore = ((FeatureStoreAuditProxy) fstore).getTarget();
+        	 }
+        	 if (pStore != null && pStore instanceof PropertyStoreAuditProxy) { 
+        		 this.pStore = ((PropertyStoreAuditProxy) pStore).getTarget();
+             }
+        }
+        
+        // Flag as OK
+        this.initialized = true;
+    }
+    
+    /**
+     * Access store as static way (single store).
+     * 
+     * @return current store
+     */
+    public FeatureStore getFeatureStore() {
+        if (!initialized) init();
+        return fstore;
+    }
+    
+    
+    /**
+     * Getter accessor for attribute 'eventPublisher'.
+     * 
+     * @return current value of 'eventPublisher'
+     */
+    public synchronized EventPublisher getEventPublisher() {
+        if (!initialized) init();
+        return eventPublisher;
+    }
+    
+    /**
+     * Getter accessor for attribute 'pStore'.
+     *
+     * @return
+     *       current value of 'pStore'
+     */
+    public PropertyStore getPropertiesStore() {
+        if (!initialized) init();
+        return pStore;
+    }
+    
+    /**
+     * Initialize flipping execution context.
+     *
+     * @return
+     *      get current context
+     */
+    public FlippingExecutionContext getCurrentContext() {
+        if (!initialized) init();
+        
+        if (null == this.currentExecutionContext.get()) {
+            this.currentExecutionContext.set(new FlippingExecutionContext());
+        }
+        return this.currentExecutionContext.get();
     }
 
     /**
@@ -568,17 +726,7 @@ public class FF4j {
      */
     public String getVersion() {
         return version;
-    }
-
-    /**
-     * Getter accessor for attribute 'pStore'.
-     *
-     * @return
-     *       current value of 'pStore'
-     */
-    public PropertyStore getPropertiesStore() {
-        return pStore;
-    }
+    }   
 
     /**
      * Setter accessor for attribute 'pStore'.
@@ -588,5 +736,89 @@ public class FF4j {
     public void setPropertiesStore(PropertyStore pStore) {
         this.pStore = pStore;
     }
+    
+    /**
+     * Clear context.
+     */
+    public void removeCurrentContext() {
+        this.currentExecutionContext.remove();
+    }
 
+    /**
+     * Getter accessor for attribute 'enableAudit'.
+     *
+     * @return
+     *       current value of 'enableAudit'
+     */
+    public boolean isEnableAudit() {
+        return enableAudit;
+    }
+
+    /**
+     * Setter accessor for attribute 'enableAudit'.
+     *
+     * @param enableAudit
+     * 		new value for 'enableAudit '
+     */
+    public void setEnableAudit(boolean enableAudit) {
+    	this.enableAudit = enableAudit;
+    	
+    	// if you disable the audit you should remove the auditProxy
+    	initialized = false;
+    }
+    
+    /**
+     * Required for spring namespace and 'fileName' attribut on ff4j tag.
+     *
+     * @param fname
+     *      target name
+     */
+    public void setFileName(String fname) { }
+    public void setAuthManager(String mnger) { }
+
+    /**
+     * Shuts down the event publisher if we actually started it (As opposed to
+     * having it dependency-injected).
+     */
+    public void stop() {
+        if (this.eventPublisher != null && this.shutdownEventPublisher) {
+            this.eventPublisher.stop();
+        }
+    }
+
+    /**
+     * Getter accessor for attribute 'source'.
+     *
+     * @return
+     *       current value of 'source'
+     */
+    public String getSource() {
+        return source;
+    }
+    
+        /**
+     * Enable Alter bean Throw InvocationTargetException, when enabled
+     * the alter bean method always throw {@link InvocationTargetException}
+     */
+    public void enableAlterBeanThrowInvocationTargetException() {
+        this.alterBeanThrowInvocationTargetException = true;
+    }
+
+    /**
+     * Disable Alter bean Throw InvocationTargetException, when disabled
+     * the alter bean method always throw the exception cause.
+     */
+    public void disableAlterBeanThrowInvocationTargetException() {
+        this.alterBeanThrowInvocationTargetException = false;
+    }
+
+    /**
+     * Getter accessor for attribute 'alterBeanThrowInvocationTargetException'.
+     *
+     * @return
+     *       current value of 'alterBeanThrowInvocationTargetException'
+     */
+    public boolean isAlterBeanThrowInvocationTargetException() {
+        return alterBeanThrowInvocationTargetException;
+    }
 }

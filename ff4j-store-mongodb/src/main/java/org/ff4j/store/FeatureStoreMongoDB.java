@@ -23,12 +23,14 @@ import org.ff4j.exception.FeatureNotFoundException;
 import org.ff4j.exception.GroupNotFoundException;
 import org.ff4j.store.mongodb.FeatureDBObjectBuilder;
 import org.ff4j.store.mongodb.FeatureDBObjectMapper;
-import org.ff4j.store.mongodb.FeatureStoreMongoConstants;
+import org.ff4j.utils.Util;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
+
+import static org.ff4j.store.mongodb.FeatureStoreMongoConstants.*;
 
 /**
  * Implementation of {@link FeatureStore} to work with MongoDB.
@@ -36,13 +38,15 @@ import com.mongodb.DBObject;
  * @author William Delanoue (@twillouer) </a>
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public class FeatureStoreMongoDB extends AbstractFeatureStore implements FeatureStoreMongoConstants {
+public class FeatureStoreMongoDB extends AbstractFeatureStore {
 
     /** Map from DBObject to Feature. */
     private static final FeatureDBObjectMapper MAPPER = new FeatureDBObjectMapper();
 
     /** Build fields. */
     private static final FeatureDBObjectBuilder BUILDER = new FeatureDBObjectBuilder();
+    public static final String FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY = "Feature identifier cannot be null nor empty";
+    public static final String GROUPNAME_CANNOT_BE_NULL_NOR_EMPTY = "Groupname cannot be null nor empty";
 
     /** MongoDB collection. */
     private final DBCollection collection;
@@ -64,7 +68,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
      *            the collection to set
      */
     public FeatureStoreMongoDB(DBCollection collection, String xmlConfFile) {
-        this.collection = collection;
+        this(collection);
         importFeaturesFromXmlFile(xmlConfFile);
     }
 
@@ -83,14 +87,14 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     /**
      * Update status of feature.
      * 
-     * @param featId
+     * @param uid
      *            feature id
      * @param enable
      *            enabler
      */
     private void updateStatus(String uid, boolean enable) {
         if (uid == null || uid.isEmpty()) {
-            throw new IllegalArgumentException("Feature identifier cannot be null nor empty");
+            throw new IllegalArgumentException(FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (!exist(uid)) {
             throw new FeatureNotFoundException(uid);
@@ -103,6 +107,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     /** {@inheritDoc} */
     @Override
     public boolean exist(String featId) {
+        Util.assertHasLength(featId);
         return 1 == collection.count(BUILDER.getFeatUid(featId));
     }
 
@@ -110,7 +115,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public Feature read(String uid) {
         if (uid == null || uid.isEmpty()) {
-            throw new IllegalArgumentException("Feature identifier cannot be null nor empty");
+            throw new IllegalArgumentException(FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY);
         }
         DBObject object = collection.findOne(BUILDER.getFeatUid(uid));
         if (object==null) {
@@ -135,7 +140,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public void delete(String uid) {
         if (uid == null || uid.isEmpty()) {
-            throw new IllegalArgumentException("Feature identifier cannot be null nor empty");
+            throw new IllegalArgumentException(FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (!exist(uid)) {
             throw new FeatureNotFoundException(uid);
@@ -147,7 +152,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public void grantRoleOnFeature(String uid, String roleName) {
         if (uid == null || uid.isEmpty()) {
-            throw new IllegalArgumentException("Feature identifier cannot be null nor empty");
+            throw new IllegalArgumentException(FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (roleName == null || roleName.isEmpty()) {
             throw new IllegalArgumentException("roleName cannot be null nor empty");
@@ -162,7 +167,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public void removeRoleFromFeature(String uid, String roleName) {
         if (uid == null || uid.isEmpty()) {
-            throw new IllegalArgumentException("Feature identifier cannot be null nor empty");
+            throw new IllegalArgumentException(FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (roleName == null || roleName.isEmpty()) {
             throw new IllegalArgumentException("roleName cannot be null nor empty");
@@ -190,23 +195,15 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
         if (fp == null) {
             throw new IllegalArgumentException("Feature cannot be null nor empty");
         }
-        Feature fpExist = read(fp.getUid());
+        read(fp.getUid());
         collection.save(MAPPER.toDBObject(fp));
-        // enable/disable
-        if (fp.isEnable() != fpExist.isEnable()) {
-            if (fp.isEnable()) {
-                enable(fp.getUid());
-            } else {
-                disable(fp.getUid());
-            }
-        }
     }
 
     /** {@inheritDoc} */
     @Override
     public boolean existGroup(String groupName) {
         if (groupName == null || groupName.isEmpty()) {
-            throw new IllegalArgumentException("Groupname cannot be null nor empty");
+            throw new IllegalArgumentException(GROUPNAME_CANNOT_BE_NULL_NOR_EMPTY);
         }
         return collection.count(BUILDER.getGroupName(groupName)) > 0;
     }
@@ -227,7 +224,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public Map<String, Feature> readGroup(String groupName) {
         if (groupName == null || groupName.isEmpty()) {
-            throw new IllegalArgumentException("Groupname cannot be null nor empty");
+            throw new IllegalArgumentException(GROUPNAME_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (!existGroup(groupName)) {
             throw new GroupNotFoundException(groupName);
@@ -244,7 +241,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public void enableGroup(String groupName) {
         if (groupName == null || groupName.isEmpty()) {
-            throw new IllegalArgumentException("Groupname cannot be null nor empty");
+            throw new IllegalArgumentException(GROUPNAME_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (!existGroup(groupName)) {
             throw new GroupNotFoundException(groupName);
@@ -259,7 +256,7 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public void disableGroup(String groupName) {
         if (groupName == null || groupName.isEmpty()) {
-            throw new IllegalArgumentException("Groupname cannot be null nor empty");
+            throw new IllegalArgumentException(GROUPNAME_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (!existGroup(groupName)) {
             throw new GroupNotFoundException(groupName);
@@ -274,10 +271,10 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public void addToGroup(String uid, String groupName) {
         if (uid == null || uid.isEmpty()) {
-            throw new IllegalArgumentException("Feature identifier cannot be null nor empty");
+            throw new IllegalArgumentException(FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (groupName == null || groupName.isEmpty()) {
-            throw new IllegalArgumentException("Groupname cannot be null nor empty");
+            throw new IllegalArgumentException(GROUPNAME_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (!exist(uid)) {
             throw new FeatureNotFoundException(uid);
@@ -291,10 +288,10 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
     @Override
     public void removeFromGroup(String uid, String groupName) {
         if (uid == null || uid.isEmpty()) {
-            throw new IllegalArgumentException("Feature identifier cannot be null nor empty");
+            throw new IllegalArgumentException(FEATURE_IDENTIFIER_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (groupName == null || groupName.isEmpty()) {
-            throw new IllegalArgumentException("Groupname cannot be null nor empty");
+            throw new IllegalArgumentException(GROUPNAME_CANNOT_BE_NULL_NOR_EMPTY);
         }
         if (!exist(uid)) {
             throw new FeatureNotFoundException(uid);
@@ -306,63 +303,11 @@ public class FeatureStoreMongoDB extends AbstractFeatureStore implements Feature
         DBObject nGroupName = BUILDER.getGroupName("");
         collection.update(target, BasicDBObjectBuilder.start(MONGO_SET, nGroupName).get());
     }
-
+    
     /** {@inheritDoc} */
     @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder("{");
-        sb.append("\"type\":\"" + this.getClass().getCanonicalName() + "\"");
-        sb.append("\"mongodb\":\"" + this.collection.getName() + "\"");
-        sb.append(",\"cached\":" + this.isCached());
-        if (this.isCached()) {
-            sb.append(",\"cacheProvider\":\"" + this.getCacheProvider() + "\"");
-            sb.append(",\"cacheStore\":\"" + this.getCachedTargetStore() + "\"");
-        }
-        Set<String> myFeatures = readAll().keySet();
-        sb.append(",\"numberOfFeatures\":" + myFeatures.size());
-        sb.append(",\"features\":[");
-        boolean first = true;
-        for (String myFeature : myFeatures) {
-            if (!first) {
-                sb.append(",");
-            }
-            first = false;
-            sb.append("\"" + myFeature + "\"");
-        }
-        Set<String> myGroups = readAllGroups();
-        sb.append("],\"numberOfGroups\":" + myGroups.size());
-        sb.append(",\"groups\":[");
-        first = true;
-        for (String myGroup : myGroups) {
-            if (!first) {
-                sb.append(",");
-            }
-            first = false;
-            sb.append("\"" + myGroup + "\"");
-        }
-        sb.append("]");
-        sb.append("}");
-        return sb.toString();
-    }
-
-    // -------- Overrided in cache proxy --------------
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isCached() {
-        return false;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getCacheProvider() {
-        return null;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getCachedTargetStore() {
-        return null;
+    public void clear() {
+        collection.remove(BasicDBObjectBuilder.start().get());
     }
 
 }

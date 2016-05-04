@@ -24,20 +24,39 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 
+import org.ff4j.cache.FF4jCacheProxy;
 import org.ff4j.core.FlippingStrategy;
-import org.ff4j.property.AbstractProperty;
+import org.ff4j.property.Property;
 
 /**
  * Custom implementation of serialization : faster + no jackson dependency
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class JsonUtils {
+ 
+    private JsonUtils() {
+    }
     
     /**
-     * Hide constructor.
+     * Cache JSON expression for a store.
+     *
+     * @param store
+     *      current store
+     * @return
+     *      cache expression
      */
-    private JsonUtils() {
+    public static final String cacheJson(Object store) {
+        StringBuilder sb = new StringBuilder();
+        if (store instanceof FF4jCacheProxy) {
+            FF4jCacheProxy cacheProxy = (FF4jCacheProxy) store;
+            sb.append(",\"cached\":true");
+            sb.append(",\"cacheProvider\":\"" + cacheProxy.getCacheProvider() + "\"");
+            sb.append(",\"cacheStore\":\"" + cacheProxy.getCachedTargetStore() + "\"");
+        } else {
+            sb.append(",\"cached\":false");
+        }
+        return sb.toString();
     }
     
     /**
@@ -101,18 +120,18 @@ public class JsonUtils {
      * @return
      *      target json expression
      */
-    public static final String customPropertiesAsJson(final Map<String, ? extends AbstractProperty<?>> customProperties) {
+    public static final String customPropertiesAsJson(final Map<String, ? extends Property<?>> customProperties) {
         StringBuilder json = new StringBuilder("{");
         if (null != customProperties && !customProperties.isEmpty()) {
             boolean first = true;
-            for (String key : customProperties.keySet()) {
+            for (Map.Entry<String, ? extends Property<?>> key : customProperties.entrySet()) {
                 json.append(first ? "" : ",");
-                json.append("\"" + key + "\":" + customProperties.get(key).toString());
+                json.append("\"" + key.getKey() + "\":" + key.getValue().toJson());
                 first = false;
             }
         }
         json.append("}");
         return json.toString();
-    } 
+    }
 
 }

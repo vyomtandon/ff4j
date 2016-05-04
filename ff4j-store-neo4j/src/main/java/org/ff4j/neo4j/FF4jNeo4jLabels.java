@@ -30,14 +30,18 @@ import org.neo4j.graphdb.Label;
 public enum FF4jNeo4jLabels implements Label {
 
     /** Node Feature. */
-    FEATURE,
+    FF4J_FEATURE,
     
     /** Node Group. */
-    FEATURE_GROUP,
+    FF4J_FEATURE_GROUP,
     
-    /** Node Role. */
-    ROLE,
+    /** StandAlone Property. */
+    FF4J_PROPERTY,
     
-    /** Strategy. */
-    FLIPPING_STRATEGY
+    /** Properties of feature. */
+    FF4J_FEATURE_PROPERTY,
+    
+    /** Node flipipng strategy. */
+    FF4J_FLIPPING_STRATEGY;
+    
 }

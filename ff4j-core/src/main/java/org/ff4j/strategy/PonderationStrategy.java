@@ -1,5 +1,7 @@
 package org.ff4j.strategy;
 
+import java.io.Serializable;
+
 /*
  * #%L
  * ff4j-core
@@ -28,9 +30,12 @@ import org.ff4j.core.FlippingExecutionContext;
 /**
  * This strategy will flip feature as soon as the release date is reached.
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class PonderationStrategy extends AbstractFlipStrategy {
+public class PonderationStrategy extends AbstractFlipStrategy implements Serializable {
+
+    /** Serial number. */
+    private static final long serialVersionUID = -2353911851539414159L;
 
     /** Return equiprobability as 50%. */
     private static final double HALF = 0.5;
@@ -63,7 +68,7 @@ public class PonderationStrategy extends AbstractFlipStrategy {
     public void init(String featureName, Map<String, String> initParams) {
         super.init(featureName, initParams);
         if (initParams != null && initParams.containsKey(PARAM_WEIGHT)) {
-            this.weight = Double.valueOf(initParams.get(PARAM_WEIGHT)).doubleValue();
+            this.weight = Double.parseDouble(initParams.get(PARAM_WEIGHT));
         }
         checkWeight();
     }
@@ -91,6 +96,13 @@ public class PonderationStrategy extends AbstractFlipStrategy {
      */
     public void setWeight(double weight) {
         this.weight = weight;
+    }
+    
+    /** {@inheritDoc} */
+    @Override
+    public Map<String, String> getInitParams() {
+        this.initParams.put(PARAM_WEIGHT, String.valueOf(weight));
+        return initParams;
     }
 
 }

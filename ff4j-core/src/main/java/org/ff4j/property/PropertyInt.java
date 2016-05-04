@@ -1,5 +1,7 @@
 package org.ff4j.property;
 
+import java.util.Set;
+
 /*
  * #%L
  * ff4j-core
@@ -20,13 +22,12 @@ package org.ff4j.property;
  * #L%
  */
 
-
 /**
  * Implementation of a property of type INT.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class PropertyInt extends AbstractProperty< Integer > {
+public class PropertyInt extends Property< Integer > {
 
     /** serial. */
     private static final long serialVersionUID = -134543098672660987L;
@@ -39,8 +40,55 @@ public class PropertyInt extends AbstractProperty< Integer > {
      * @param lvl
      *      current log level
      */
+    public PropertyInt() {
+    }
+    
+    /**
+     * Constructor by string expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current log level
+     */
+    public PropertyInt(String uid) {
+       super(uid);
+    }
+    
+    /**
+     * Constructor by string expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current log level
+     */
     public PropertyInt(String uid, String value) {
        super(uid, value);
+    }
+    
+    /**
+     * Constructor by string expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current log level
+     */
+    public PropertyInt(String uid, Integer value) {
+       super(uid, value);
+    }
+
+    /**
+     * Constructor by string expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current log level
+     */
+    public PropertyInt(String uid, Integer value, Set <Integer> fixValues) {
+       super(uid, value, fixValues);
     }
     
     /** {@inheritDoc} */

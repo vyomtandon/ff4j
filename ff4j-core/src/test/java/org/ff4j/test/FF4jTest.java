@@ -26,26 +26,161 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
-
-import org.junit.Assert;
+import java.util.HashSet;
 
 import org.ff4j.FF4j;
+import org.ff4j.audit.Event;
+import org.ff4j.audit.EventConstants;
+import org.ff4j.audit.EventPublisher;
+import org.ff4j.audit.repository.InMemoryEventRepository;
 import org.ff4j.core.Feature;
 import org.ff4j.core.FlippingExecutionContext;
 import org.ff4j.exception.FeatureNotFoundException;
+import org.ff4j.property.PropertyString;
 import org.ff4j.store.InMemoryFeatureStore;
+import org.ff4j.strategy.el.ExpressionFlipStrategy;
+import org.ff4j.utils.Util;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
  * Test operations over {@link FF4j}
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class FF4jTest extends AbstractFf4jTest {
 
     @Override
     public FF4j initFF4j() {
         return new FF4j("ff4j.xml");
+    }
+    
+    @Test(expected = FeatureNotFoundException.class)
+    public void readFeatureNotFound() {
+        // Given
+        FF4j ff4j = new FF4j();
+        // When
+        ff4j.getFeature("i-dont-exist");
+        // Then
+        // expect error...
+    }
+    
+    @Test
+    public void testDeleteFeature() {
+        FF4j ff4j = new FF4j("ff4j.xml");
+        ff4j.audit();
+        Assert.assertTrue(ff4j.exist(F1));
+        ff4j.delete(F1);
+        Assert.assertFalse(ff4j.exist(F1));
+    }
+    
+    @Test
+    public void testDisableWithAudit() {
+        // Given
+        FF4j ff4j = new FF4j(getClass().getClassLoader().getResourceAsStream("ff4j.xml"));
+        ff4j.audit();
+        Assert.assertTrue(ff4j.exist(F1));
+        Assert.assertTrue(ff4j.getFeature(F1).isEnable());
+        // When
+        ff4j.disable(F1);
+        // Then
+        Assert.assertFalse(ff4j.getFeature(F1).isEnable());
+    }
+    
+    @Test
+    public void createDeleteProperty() {
+        FF4j ff4j = new FF4j();
+        ff4j.createProperty(new PropertyString("p1", "v1"));
+        ff4j.audit();
+        ff4j.createProperty(new PropertyString("p2", "v2"));
+        Assert.assertTrue(ff4j.getPropertiesStore().existProperty("p1"));
+        ff4j.deleteProperty("p1");
+        Assert.assertFalse(ff4j.getPropertiesStore().existProperty("p1"));
+    }
+    
+    @Test
+    public void monitoringAudit() {
+        // Given
+        FF4j ff4j = new FF4j();
+        ff4j.setEventPublisher(new EventPublisher());
+        ff4j.setEventRepository(new InMemoryEventRepository());
+        ff4j.removeCurrentContext();
+        ff4j.getCurrentContext();
+        // When
+        ff4j.stop();
+        
+        // When
+        ff4j.setEventPublisher(null);
+        ff4j.getEventPublisher();
+        ff4j.stop();
+        
+        // When
+        Event evt = new Event("f1", EventConstants.TARGET_FEATURE, "f2", EventConstants.ACTION_CHECK_OK);
+        Assert.assertNotNull(evt.toJson());
+        Assert.assertNotNull(evt.toString());
+        
+        // When
+        EventPublisher ep = new EventPublisher();
+        new EventPublisher(ep.getRepository(), null);
+        ep.setRepository(new InMemoryEventRepository());
+        // Then
+        Assert.assertNotNull(ep.getRepository());
+    }
+    
+    @Test
+    public void enableDisableGroups() {
+        // Given
+        FF4j ff4j = new FF4j();
+        ff4j.audit();
+        ff4j.setFeatureStore(new InMemoryFeatureStore());
+        ff4j.createFeature("f1", true);
+        ff4j.createFeature("f2");
+        ff4j.getFeatureStore().addToGroup("f1", "g1");
+        ff4j.getFeatureStore().addToGroup("f2", "g1");
+        
+        // When
+        ff4j.disableGroup("g1");
+        // Then
+        Assert.assertFalse(ff4j.getFeature("f1").isEnable());
+        Assert.assertFalse(ff4j.getFeature("f2").isEnable());
+        
+        // When
+        ff4j.enableGroup("g1");
+        // Then
+        Assert.assertTrue(ff4j.getFeature("f1").isEnable());
+        Assert.assertTrue(ff4j.getFeature("f2").isEnable());
+        
+        // When
+        ff4j.enable("f1");
+        ff4j.setFileName(null);
+        // Then
+        Assert.assertTrue(ff4j.getFeature("f1").isEnable());
+    }
+    
+    @Test
+    public void testReadCoreMetadata() {
+        FF4j ff4j = new FF4j();
+        ff4j.getVersion();
+        Assert.assertNotNull(ff4j.getStartTime());
+        Assert.assertNotNull(ff4j.getPropertiesStore());
+        Assert.assertNotNull(ff4j.getCurrentContext());
+        Assert.assertNotNull(ff4j.getProperties());
+    }
+    
+    @Test
+    public void testToString() {
+        FF4j ff4j = new FF4j("ff4j.xml");
+        ff4j.toString();
+        Assert.assertNotNull(ff4j.getFeatureStore());
+        ff4j.setFeatureStore(null);
+        ff4j.setPropertiesStore(null);
+        ff4j.setEventRepository(null);
+        ff4j.setEventPublisher(null);
+        ff4j.setAuthorizationsManager(new DefinedPermissionSecurityManager(Util.set("val1")));
+        ff4j.toString();
+        
+        ff4j.removeCurrentContext();
+        ff4j.getCurrentContext();
     }
 
     @Test
@@ -54,7 +189,7 @@ public class FF4jTest extends AbstractFf4jTest {
         assertEquals(5, ff4j.getFeatures().size());
 
         // Dynamically create feature and add it to the store (tests purpose)
-        ff4j.create("sayHello");
+        ff4j.createFeature("sayHello");
 
         // Enable Feature
         ff4j.enable("sayHello");
@@ -70,7 +205,7 @@ public class FF4jTest extends AbstractFf4jTest {
 
         // Default : store = inMemory, load features from ff4j.xml file
         FF4j ff4j = new FF4j("ff4j.xml");
-        ff4j.setAutocreate(true);
+        ff4j.autoCreate();
         assertFalse(ff4j.exist("autoCreatedFeature"));
 
         // Auto creation by testing its value
@@ -87,13 +222,13 @@ public class FF4jTest extends AbstractFf4jTest {
         FF4j ff4j = new FF4j();
 
         // Dynamically register new features
-        ff4j.create("f1").enable("f1");
+        ff4j.createFeature("f1").enable("f1");
 
         // Assertions
         assertTrue(ff4j.exist("f1"));
         assertTrue(ff4j.check("f1"));
     }
-
+  
     // enabling...
 
     @Test
@@ -133,15 +268,9 @@ public class FF4jTest extends AbstractFf4jTest {
         Assert.assertEquals(5, ff4j.getFeatures().size());
     }
 
-    public void testGetFeature() {}
-
-    public void testGetFeature_DoesNotExist() {}
-
-    public void testGetFeature_DoesNotExistAutoCreate() {}
-
     @Test
     public void testFlipped() {
-        FF4j ff4j = new FF4j().autoCreate(true).create(
+        FF4j ff4j = new FF4j().autoCreate(true).createFeature(
                 new Feature("coco", true, "grp2", "", Arrays.asList(new String[] {"ROLEA"})));
         Assert.assertTrue(ff4j.check("coco"));
         ff4j.setAuthorizationsManager(mockAuthManager);
@@ -155,7 +284,17 @@ public class FF4jTest extends AbstractFf4jTest {
     }
     
     @Test
-    public void testToString() {
+    public void testOverrideStrategy() {
+        FF4j ff4j = new FF4j();
+        ff4j.audit();
+        ff4j.createFeature("N1", true, "description NEWS");
+        ff4j.createFeature("N2", false, "description NEWS");
+        Assert.assertTrue(ff4j.check("N1"));
+        Assert.assertFalse(ff4j.checkOveridingStrategy("N1", new ExpressionFlipStrategy("N1", "N1 & N2")));
+    }
+        
+    @Test
+    public void testToString2() {
         Assert.assertTrue(ff4j.toString().contains(InMemoryFeatureStore.class.getCanonicalName()));
     }
 
@@ -164,6 +303,45 @@ public class FF4jTest extends AbstractFf4jTest {
         Assert.assertNotNull(ff4j.exportFeatures());
     }
 
+    @Test
+    public void authorisationManager() {
+        FF4j ff4j = new FF4j();
+        ff4j.setAuthorizationsManager(new DefinedPermissionSecurityManager(null));
+        ff4j.getAuthorizationsManager().toString();
+        ff4j.createFeature("f1");
+        ff4j.check("f1");
+        
+        ff4j.setAuthorizationsManager(new DefinedPermissionSecurityManager(new HashSet<String>()));
+        ff4j.getAuthorizationsManager().toString();
+        
+        ff4j.setAuthorizationsManager(new DefinedPermissionSecurityManager(Util.set("S1", "S2")));
+        ff4j.getAuthorizationsManager().toString();
+    }
+    
+    @Test
+    public void testAllowed() {
+        FF4j ff4j = new FF4j();
+        ff4j.setAuthorizationsManager(new DefinedPermissionSecurityManager(Util.set("USER")));
+        Feature f1 = new Feature("f1", true, null, null, Util.set("USER"));
+        ff4j.createFeature(f1);
+        
+        ff4j.check(f1.getUid());
+        ff4j.isAllowed(f1);
+        
+    }
 
+    @Test
+    public void testEnableAlterBeanThrowInvocationTargetException() {
+        FF4j ff4j = new FF4j();
+        ff4j.enableAlterBeanThrowInvocationTargetException();
+        Assert.assertTrue(ff4j.isAlterBeanThrowInvocationTargetException());
+    }
+
+    @Test
+    public void testDisableAlterBeanThrowInvocationTargetException() {
+        FF4j ff4j = new FF4j();
+        ff4j.disableAlterBeanThrowInvocationTargetException();
+        Assert.assertFalse(ff4j.isAlterBeanThrowInvocationTargetException());
+    }
 
 }

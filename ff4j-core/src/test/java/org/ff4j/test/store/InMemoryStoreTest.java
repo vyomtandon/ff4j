@@ -13,20 +13,19 @@ package org.ff4j.test.store;
 
 import java.util.LinkedHashMap;
 
-import org.junit.Assert;
-
 import org.ff4j.core.Feature;
 import org.ff4j.core.FeatureStore;
 import org.ff4j.store.InMemoryFeatureStore;
 import org.ff4j.strategy.PonderationStrategy;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
  * All TEST LOGIC is in super class to be processed on EACH STORE.
  * 
- * @author clunven
+ * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public class InMemoryStoreTest extends AbstractStoreTest {
+public class InMemoryStoreTest extends FStoreTestSupport {
 
     /** {@inheritDoc} */
     @Override
@@ -57,5 +56,50 @@ public class InMemoryStoreTest extends AbstractStoreTest {
     public void testUnitFeatureInitialization3() {
         new InMemoryFeatureStore("invalid.xml");
     }
-
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testUnitFeatureInitialization5() {
+        new InMemoryFeatureStore((String) null);
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testUnitFeatureInitialization6() {
+        new InMemoryFeatureStore("");
+    }
+    
+    @Test
+    public void testUnitFeatureInitialization4() {
+        InMemoryFeatureStore f = new InMemoryFeatureStore();
+        f.toJson();
+        f.toString();
+        f.getFileName();
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testDonotImportEmpty() {
+        InMemoryFeatureStore f = new InMemoryFeatureStore();
+        f.importFeaturesFromXmlFile("");
+    }
+    
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testDonotImportNull() {
+        InMemoryFeatureStore f = new InMemoryFeatureStore();
+        f.importFeaturesFromXmlFile(null);
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testDonotImportInvalid() {
+        InMemoryFeatureStore f = new InMemoryFeatureStore();
+        f.importFeaturesFromXmlFile("invalid.xml");
+    }
+    
+    @Test
+    public void testImportTwice() {
+        InMemoryFeatureStore f = new InMemoryFeatureStore();
+        f.importFeaturesFromXmlFile("ff4j.xml");
+        f.importFeaturesFromXmlFile("ff4j.xml");
+        Assert.assertFalse(f.readAll().isEmpty());
+    }
+    
 }

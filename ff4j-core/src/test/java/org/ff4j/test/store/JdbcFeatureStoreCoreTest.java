@@ -15,11 +15,12 @@ import org.ff4j.core.FeatureStore;
 import org.ff4j.store.JdbcFeatureStore;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Test;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
-public class JdbcFeatureStoreCoreTest extends AbstractStoreTest {
+public class JdbcFeatureStoreCoreTest extends FStoreTestSupport {
 
     /** DataBase. */
     private EmbeddedDatabase db;
@@ -31,8 +32,10 @@ public class JdbcFeatureStoreCoreTest extends AbstractStoreTest {
     @Override
     protected FeatureStore initStore() {
         builder = new EmbeddedDatabaseBuilder();
-        db = builder.setType(EmbeddedDatabaseType.HSQL).addScript("classpath:schema-ddl.sql").addScript("classpath:ff-store.sql")
-                .build();
+        db = builder.
+        		setType(EmbeddedDatabaseType.HSQL).//
+        		addScript("classpath:schema-ddl.sql").//
+        		addScript("classpath:ff-store.sql").build();
 
         JdbcFeatureStore jdbcStore = new JdbcFeatureStore();
         jdbcStore.setDataSource(db);
@@ -44,13 +47,19 @@ public class JdbcFeatureStoreCoreTest extends AbstractStoreTest {
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        db = builder.setType(EmbeddedDatabaseType.HSQL).addScript("classpath:schema-ddl.sql").addScript("classpath:ff-store.sql")
-                .build();
+        db = builder.setType(EmbeddedDatabaseType.HSQL).
+        		addScript("classpath:schema-ddl.sql").
+        		addScript("classpath:ff-store.sql").build();
     }
 
     /** {@inheritDoc} */
     @After
     public void tearDown() throws Exception {
         db.shutdown();
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testRemoveFromGroupInvalidGroup() {
+        testedStore.removeFromGroup(F4, G0);
     }
 }

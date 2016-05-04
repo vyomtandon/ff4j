@@ -20,64 +20,107 @@ package org.ff4j.audit;
  * #L%
  */
 
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.ff4j.audit.repository.EventRepository;
 import org.ff4j.audit.repository.InMemoryEventRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Default implementation of repository.
- * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ *
+ * @author Cedrick Lunven (@clunven)
  */
 public class EventPublisher {
 
-    /** default pool size. */
-    private static final int DEFAULT_POOL_SIZE = 3;
+    /** Logger for the class. */
+    private static final Logger LOG = LoggerFactory.getLogger(EventPublisher.class);
 
+    /** DEFAULT. */
+    public static final int DEFAULT_QUEUE_CAPACITY = 100;
+    
+    /** DEFAULT. */
+    public static final int DEFAULT_POOL_SIZE = 4;
+    
+    /** 2s to save the event other wize skip. */
+    public static final long timeout = 2000L;
+    
     /** Executor for item writer. */
-    private ExecutorService executor = Executors.newFixedThreadPool(DEFAULT_POOL_SIZE);
+    private ExecutorService executor;
 
     /** Repository to save events. */
-    private EventRepository repository = new InMemoryEventRepository();
+    private EventRepository repository;
+
+    /** the amount of time to wait after submitting for the task to complete. */
+    private final long submitTimeout;
+
+    /** flag to shiutdown executor on failure. */
+    private final boolean shutdownExecutor;
 
     /**
      * Default constructor.
      */
     public EventPublisher() {
+        this(DEFAULT_QUEUE_CAPACITY, DEFAULT_POOL_SIZE, new InMemoryEventRepository());
     }
-
+    
     /**
-     * Size of thread pool.
-     * 
-     * @param threadCount
-     */
-    public EventPublisher(int threadCount) {
-        executor = Executors.newFixedThreadPool(threadCount);
-    }
-
-    /**
-     * Constructor with repository
-     * 
-     * @param er
-     *            target repository
+     * Default constructor.
      */
     public EventPublisher(EventRepository er) {
-        repository = er;
+        this(DEFAULT_QUEUE_CAPACITY, DEFAULT_POOL_SIZE, er);
+    }
+        
+    /**
+     * Default constructor.
+     */
+    public EventPublisher(int queueCapacity, int poolSize, EventRepository er) {
+        this(queueCapacity, poolSize, er, timeout);
     }
 
     /**
-     * Size of thread pool.
-     * 
-     * @param threadCount
-     *            thread pool size
-     * @param er
-     *            target repository
+     * Default constructor.
      */
-    public EventPublisher(int threadCount, EventRepository er) {
-        executor = Executors.newFixedThreadPool(threadCount);
+    public EventPublisher(int queueCapacity, int poolSize, EventRepository er, long submitTimeout) {
+        // Initializing queue
+        final BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(queueCapacity);
+        // Executor with worker to process threads
+        RejectedExecutionHandler rej = new EventRejectedExecutionHandler();
+        ThreadFactory tFactorty = new PublisherThreadFactory();
+        this.executor = 
+                new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS, queue, tFactorty, rej);
+        // Override repository
+        this.repository = er;
+        this.submitTimeout = submitTimeout;
+        this.shutdownExecutor = true;
+    }
+
+    /**
+     * @param er the event repository to use
+     * @param executorService the executor service
+     */
+    public EventPublisher(EventRepository er, ExecutorService executorService) {
+        this(er, executorService, timeout);
+    }
+
+    /**
+     * @param er the event repository to use
+     * @param executorService the executor service
+     * @param submitTimeout
+     */
+    public EventPublisher(EventRepository er, ExecutorService executorService, long submitTimeout) {
         repository = er;
+        executor = executorService;
+        this.submitTimeout = submitTimeout;
+        this.shutdownExecutor = false;
     }
 
     /**
@@ -87,35 +130,23 @@ public class EventPublisher {
      *            event.
      */
     public void publish(Event e) {
-        executor.submit(new EventWorker(e, repository));
-    }
-
-    /**
-     * Publish event to repository.
-     * 
-     * @param featureName
-     *            target feature name
-     * @param type
-     *            event type
-     */
-    public void publish(String featureName, EventType type) {
-        publish(new Event(featureName, type));
-    }
-
-    /**
-     * Paramterized constructor.
-     * 
-     * @param featureName
-     *            target feature name
-     * @param flipped
-     *            if flipped
-     */
-    public void publish(String featureName, boolean flipped) {
-        Event evt = new Event(featureName, EventType.HIT_FLIPPED);
-        if (!flipped) {
-            evt.setType(EventType.HIT_NOT_FLIPPED);
+        try {
+            EventWorker ew = new EventWorker(e, repository);
+            final Future<Boolean> check = executor.submit(ew);
+            check.get(submitTimeout, TimeUnit.MILLISECONDS);
+        } catch (Exception e1) {
+            LOG.error("Cannot publish event " + e1.getMessage(), e1);
         }
-        publish(evt);
+    }
+
+    /**
+     * Stops the event publisher. If we started an executor service, it will
+     * be shutdown here.
+     */
+    public void stop() {
+        if (this.shutdownExecutor) {
+            this.executor.shutdownNow();
+        }
     }
 
     /**

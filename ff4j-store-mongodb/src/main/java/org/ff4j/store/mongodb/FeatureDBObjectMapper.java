@@ -1,5 +1,7 @@
 package org.ff4j.store.mongodb;
 
+import java.util.HashMap;
+
 /*
  * #%L
  * ff4j-store-mongodb
@@ -21,21 +23,29 @@ package org.ff4j.store.mongodb;
  */
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.ff4j.core.Feature;
 import org.ff4j.core.FlippingStrategy;
-import org.ff4j.exception.FeatureAccessException;
-import org.ff4j.utils.ParameterUtils;
+import org.ff4j.property.Property;
+import org.ff4j.property.util.PropertyJsonBean;
+import org.ff4j.utils.JsonUtils;
+import org.ff4j.utils.MappingUtil;
 
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
+import com.mongodb.util.JSON;
+
+import static org.ff4j.store.mongodb.FeatureStoreMongoConstants.*;
 
 /**
  * MApping from Mongo document to Feature.
  * 
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public final class FeatureDBObjectMapper implements FeatureStoreMongoConstants {
+public final class FeatureDBObjectMapper {
 
     /**
      * Convert {@link DBObject} to {@link Feature}.
@@ -47,13 +57,38 @@ public final class FeatureDBObjectMapper implements FeatureStoreMongoConstants {
     public Feature mapFeature(DBObject dbObject) {
         String featUid = (String) dbObject.get(UUID);
         boolean status = (Boolean) dbObject.get(ENABLE);
-
         Feature f = new Feature(featUid, status);
         f.setDescription((String) dbObject.get(DESCRIPTION));
         f.setGroup((String) dbObject.get(GROUPNAME));
         f.setPermissions(mapAuthorization(dbObject));
         f.setFlippingStrategy(mapStrategy(featUid, dbObject));
+        f.setCustomProperties(mapCustomProperties(dbObject));
         return f;
+    }
+    
+    /**
+     * Map a property.
+     *
+     * @param dbObject
+     *      db object
+     * @return
+     *      list of property
+     */
+    public Property< ? > mapProperty(DBObject dbObject) {
+        PropertyJsonBean pf = new PropertyJsonBean();
+        pf.setName((String) dbObject.get(PROPERTY_NAME));
+        pf.setDescription((String) dbObject.get(PROPERTY_DESCRIPTION));
+        pf.setType((String) dbObject.get(PROPERTY_TYPE));
+        pf.setValue((String) dbObject.get(PROPERTY_VALUE));
+        if (dbObject.containsField(PROPERTY_FIXEDVALUES)) {
+            BasicDBList dbList = (BasicDBList) dbObject.get(PROPERTY_FIXEDVALUES);
+            if (dbList != null) {
+                for(Object item : dbList) {
+                    pf.addFixedValue((String) item);
+                }
+            }
+        }
+        return pf.asProperty();
     }
 
     /**
@@ -67,8 +102,12 @@ public final class FeatureDBObjectMapper implements FeatureStoreMongoConstants {
         String strategyColumn = null;
         String expressionColumn = null;
         if (feature.getFlippingStrategy() != null) {
-            strategyColumn = feature.getFlippingStrategy().getClass().getCanonicalName();
-            expressionColumn = ParameterUtils.fromMap(feature.getFlippingStrategy().getInitParams());
+            strategyColumn   = feature.getFlippingStrategy().getClass().getCanonicalName();
+            expressionColumn = MappingUtil.fromMap(feature.getFlippingStrategy().getInitParams());
+        }
+        String customProperties = null;
+        if (feature.getCustomProperties() != null) {
+            customProperties = JsonUtils.customPropertiesAsJson(feature.getCustomProperties());
         }
         return new FeatureDBObjectBuilder().addFeatUid(feature.getUid()).//
                 addEnable(feature.isEnable()).//
@@ -76,7 +115,18 @@ public final class FeatureDBObjectMapper implements FeatureStoreMongoConstants {
                 addGroupName(feature.getGroup()).//
                 addStrategy(strategyColumn).//
                 addExpression(expressionColumn).//
+                addCustomProperties(customProperties).
                 addRoles(feature.getPermissions()).build();
+    }
+    
+    public DBObject fromProperty2DBObject(Property<?> property) {
+        PropertyJsonBean pjb = new PropertyJsonBean(property);
+        return new PropertyDBObjectBuilder().//
+                addName(pjb.getName()). //
+                addType(pjb.getType()). //
+                addValue(pjb.getValue()). //
+                addDescription(pjb.getDescription()). //
+                addFixedValues(pjb.getFixedValues()).build();
     }
 
     /**
@@ -106,20 +156,34 @@ public final class FeatureDBObjectMapper implements FeatureStoreMongoConstants {
      */
     private FlippingStrategy mapStrategy(String featUid, DBObject dbObject) {
         String strategy = (String) dbObject.get(STRATEGY);
+        Map < String, String > initParams = MappingUtil.toMap((String) dbObject.get(EXPRESSION));
         if (strategy != null && !"".equals(strategy)) {
-            try {
-                FlippingStrategy flipStrategy = (FlippingStrategy) Class.forName(strategy).newInstance();
-                flipStrategy.init(featUid, ParameterUtils.toMap((String) dbObject.get(EXPRESSION)));
-                return flipStrategy;
-            } catch (InstantiationException ie) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, no default constructor available", ie);
-            } catch (IllegalAccessException iae) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, no visible constructor", iae);
-            } catch (ClassNotFoundException e) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, classNotFound", e);
+            return MappingUtil.instanceFlippingStrategy(featUid, strategy, initParams);
+        }
+        return null;
+    }
+    
+    /**
+     * Custom Properties.
+     *
+     * @param dbObject
+     *      db object
+     * @return
+     *      list of property
+     */
+    @SuppressWarnings("unchecked")
+    private Map < String, Property<?> > mapCustomProperties(DBObject dbObject) {
+        Map < String, Property<?> > mapOfCustomProperties = new HashMap<String, Property<?>>();
+        if (dbObject.containsField(CUSTOMPROPERTIES)) {
+            String properties = (String) dbObject.get(CUSTOMPROPERTIES);
+            Map < String, BasicDBObject > values = (Map<String, BasicDBObject>) JSON.parse(properties);
+            for (Map.Entry<String,BasicDBObject> entry : values.entrySet()) {
+                mapOfCustomProperties.put(entry.getKey(), mapProperty(entry.getValue()));
             }
         }
-        return (FlippingStrategy) dbObject.get(STRATEGY);
+        return mapOfCustomProperties;
     }
+    
+   
 
 }

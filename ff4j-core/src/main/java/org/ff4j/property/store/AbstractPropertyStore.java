@@ -4,9 +4,11 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.Set;
 
-import org.ff4j.conf.XmlConfiguration;
+import org.ff4j.conf.XmlConfig;
 import org.ff4j.conf.XmlParser;
-import org.ff4j.property.AbstractProperty;
+import org.ff4j.exception.PropertyNotFoundException;
+import org.ff4j.property.Property;
+import org.ff4j.utils.Util;
 
 /*
  * #%L
@@ -31,7 +33,7 @@ import org.ff4j.property.AbstractProperty;
 /**
  * Superclass for any property store.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public abstract class AbstractPropertyStore implements PropertyStore {
     
@@ -41,7 +43,7 @@ public abstract class AbstractPropertyStore implements PropertyStore {
      * @param xmlConfFile
      *      xml configuration file
      */
-    public  Map<String, AbstractProperty<?>> importPropertiesFromXmlFile(String xmlConfFile) {
+    public  Map<String, Property<?>> importPropertiesFromXmlFile(String xmlConfFile) {
         // Argument validation
         if (xmlConfFile == null || xmlConfFile.isEmpty()) {
             throw new IllegalArgumentException("Configuration filename cannot be null nor empty");
@@ -52,17 +54,23 @@ public abstract class AbstractPropertyStore implements PropertyStore {
             throw new IllegalArgumentException("File " + xmlConfFile + " could not be read, please check path and rights");
         }
         // Use the Feature Parser
-        XmlConfiguration conf = new XmlParser().parseConfigurationFile(xmlIS);
-        Map<String, AbstractProperty<?>> properties = conf.getProperties();
+        XmlConfig conf = new XmlParser().parseConfigurationFile(xmlIS);
+        Map<String, Property<?>> properties = conf.getProperties();
 
         // Override existing configuration within database
-        for (String featureName : properties.keySet()) {
-            if (exist(featureName)) {
-                delete(featureName);
+        for (Map.Entry<String,Property<?>> featureName : properties.entrySet()) {
+            if (existProperty(featureName.getKey())) {
+                deleteProperty(featureName.getKey());
             }
-            create(properties.get(featureName));
+            createProperty(featureName.getValue());
         }
         return properties;
+    }
+    
+    /** {@inheritDoc} */
+    public boolean isEmpty() {
+        Set < String > pNames = listPropertyNames();
+        return pNames == null || pNames.isEmpty();
     }
     
     /** {@inheritDoc} */
@@ -83,5 +91,38 @@ public abstract class AbstractPropertyStore implements PropertyStore {
         sb.append("]}");
         return sb.toString();
     }
+    
+    /**
+     * Validate property name and existence
+     *
+     * @param uid
+     *      target uid
+     */
+    protected void assertPropertyName(String name) {
+        Util.assertHasLength(name);
+        if (!existProperty(name)) {
+            throw new PropertyNotFoundException(name);
+        }
+    }
+    
+    /** {@inheritDoc} */
+    public <T> void updateProperty(Property<T> prop) {
+        Util.assertNotNull(prop);
+        // Delete
+        deleteProperty(prop.getName());
+        // Create
+        createProperty(prop);
+    }
+    
+    /** {@inheritDoc} */
+    public void updateProperty(String name, String newValue) {
+        // Read from redis, feature not found if no present
+        Property<?> p = readProperty(name);
+        // Update within Object
+        p.setValueFromString(newValue);
+        // Serialization and update key, update TTL
+        updateProperty(p);
+    }
+
     
 }

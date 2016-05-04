@@ -1,8 +1,9 @@
 package org.ff4j.property.store;
 
 import java.util.Map;
+import java.util.Set;
 
-import org.ff4j.property.AbstractProperty;
+import org.ff4j.property.Property;
 
 /*
  * #%L
@@ -27,7 +28,7 @@ import org.ff4j.property.AbstractProperty;
 /**
  * CRUD repository to perform operation on properties.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public interface PropertyStore {
     
@@ -39,7 +40,7 @@ public interface PropertyStore {
      * @return
      *      if the property exist
      */
-    boolean exist(String name);
+    boolean existProperty(String name);
     
     /**
      * Create new property within store.
@@ -47,7 +48,7 @@ public interface PropertyStore {
      * @param value
      *      target value
      */
-    <T> void create(AbstractProperty<T> value);
+    <T> void createProperty(Property<T> value);
     
     /**
      * Read property value.
@@ -57,7 +58,7 @@ public interface PropertyStore {
      * @return
      *      property of exist
      */
-    AbstractProperty<?> read(String name);
+    Property<?> readProperty(String name);
     
     /**
      * Update existing property.
@@ -67,7 +68,7 @@ public interface PropertyStore {
      * @param newValue
      *      new value
      */
-    void update(String name, String newValue);
+    void updateProperty(String name, String newValue);
     
     /**
      * Update existing property.
@@ -77,7 +78,7 @@ public interface PropertyStore {
      * @param newValue
      *      new value
      */
-    <T> void update(AbstractProperty<T> fixedValue);
+    <T> void updateProperty(Property<T> fixedValue);
     
     /**
      * Delete current property.
@@ -85,7 +86,7 @@ public interface PropertyStore {
      * @param name
      *      target name
      */
-    void delete(String name);
+    void deleteProperty(String name);
     
     /**
      * Retrieve all properties from store.
@@ -93,6 +94,30 @@ public interface PropertyStore {
      * @return
      *      all properties from store
      */
-    Map<String, AbstractProperty<?> > readAllProperties();
-
+    Map<String, Property<?> > readAllProperties();
+    
+    /**
+     * List all property names.
+     *
+     * @return
+     */
+    Set < String > listPropertyNames();
+    
+    /**
+     * Tell if a store is empty
+     * 
+     * @return
+     *      target store
+     */
+    boolean isEmpty();
+    
+    /**
+     * Empty current property store.
+     *
+     */
+    void clear();
+    
+    
+    
+    
 }

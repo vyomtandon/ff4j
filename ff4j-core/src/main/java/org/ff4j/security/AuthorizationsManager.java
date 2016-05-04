@@ -16,10 +16,18 @@ import java.util.Set;
 /**
  * Allow flipping only if user is allowed to do so.
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public interface AuthorizationsManager {
 
+    /**
+     * Retrieve logged user name (audit purposes).
+     *
+     * @return
+     *      current user name
+     */
+    String getCurrentUserName();
+    
     /**
      * Retrieves current autorization from context.
      * 

@@ -21,8 +21,6 @@ package org.ff4j.utils.json;
  */
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,13 +28,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.ff4j.core.Feature;
 import org.ff4j.core.FlippingStrategy;
-import org.ff4j.property.AbstractProperty;
 import org.ff4j.property.Property;
+import org.ff4j.property.util.PropertyFactory;
+import org.ff4j.utils.MappingUtil;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Unmarshalling data from JSON with Jackson.
@@ -47,7 +45,13 @@ public class FeatureJsonParser {
 
     /** Jackson mapper. */
     private static ObjectMapper objectMapper = new ObjectMapper();
-
+    
+    /**
+     * Hide constructor.
+     */
+    private FeatureJsonParser() {
+    }
+    
     /**
      * Unmarshall {@link Feature} from json string.
      *
@@ -79,10 +83,10 @@ public class FeatureJsonParser {
         // flipping strategy
         f.setFlippingStrategy(parseFlipStrategy(f.getUid(), (LinkedHashMap<String, Object>) fMap.get("flippingStrategy")));
         // custom properties
-        f.setCustomProperties(parseCustomProperties(f.getUid(), (LinkedHashMap<String, Object>) fMap.get("customProperties")));
+        Map <String, Object > propertyMap = (Map < String, Object >) fMap.get("customProperties");
+        f.setCustomProperties(parseCustomProperties(propertyMap));
         return f;
-    }
-    
+    }    
     
     /**
      * Parse the "customproperties" JSOn attribute.
@@ -95,56 +99,38 @@ public class FeatureJsonParser {
      *      target map of properties
      */
     @SuppressWarnings("unchecked")
-    private static Map < String, AbstractProperty<?>> parseCustomProperties(String uid, LinkedHashMap<String, Object> customPTag) {
-        Map < String, AbstractProperty<?>> myProperties = new LinkedHashMap<String, AbstractProperty<?>>();
+    private static Map < String, Property<?>> parseCustomProperties(Map <String, Object > customPTag) {
+        Map < String, Property<?>> myProperties = new LinkedHashMap<String, Property<?>>();
         if (null != customPTag && !customPTag.isEmpty()) {
             // Loop over properties
-            for (Map.Entry<String, Object> property : customPTag.entrySet()) {
-                HashMap<String, Object> propertyJson = (HashMap<String, Object>) property.getValue();
+            for (Object property : customPTag.values()) {
+                HashMap<String, Object> propertyJson = (HashMap<String, Object>) property;
                 String propertyName = (String) propertyJson.get("name");
                 String propertyVal  = String.valueOf(propertyJson.get("value"));
-                AbstractProperty<?> ap = new Property(propertyName, propertyVal);
-                
-                // Dedicated Type
                 String propertyType = (String) propertyJson.get("type");
-                if (propertyType != null) {
-                    try {
-                        // Construction by dedicated constructor with introspection
-                        Constructor<?> constr = Class.forName(propertyType).getConstructor(String.class, String.class);
-                        ap = (AbstractProperty<?>) constr.newInstance(propertyName, propertyVal);
-                    } catch (InstantiationException e) {
-                        throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' check default constructor", e);
-                    } catch (IllegalAccessException e) {
-                        throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' check visibility", e);
-                    } catch (ClassNotFoundException e) {
-                        throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' not found", e);
-                    } catch (InvocationTargetException e) {
-                        throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "'  erro within constructor", e);
-                    } catch (NoSuchMethodException e) {
-                        throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' constructor not found", e);
-                    } catch (SecurityException e) {
-                        throw new IllegalArgumentException("Cannot instanciate '" + propertyType + "' check constructor visibility", e);
-                    }
-                }
-                
-                //  Is there any fixed Value ?
+                Property<?> ap = PropertyFactory.createProperty(propertyName, propertyType, propertyVal);
+                // FixedValued
                 List <Object> listOfFixedValue = (List<Object>) propertyJson.get("fixedValues");
-                if (listOfFixedValue != null) {
-                    for (Object v : listOfFixedValue) {
-                        ap.add2FixedValueFromString(String.valueOf(v));
-                    }
-                    // Check fixed value
-                    if (ap.getFixedValues() != null && !ap.getFixedValues().contains(ap.getValue())) {
-                        throw new IllegalArgumentException("Cannot create property <" + ap.getName() + 
-                                "> invalid value <" + ap.getValue() + 
-                                "> expected one of " + ap.getFixedValues());
-                    }
-                }
-                myProperties.put(ap.getName(),ap);
+                addFixedValuesToProperty(ap, listOfFixedValue);
+                myProperties.put(ap.getName(), ap);
             }
         }
         return myProperties;
         
+    }
+
+    private static void addFixedValuesToProperty(Property<?> ap, List<Object> listOfFixedValue) {
+        if (listOfFixedValue != null) {
+            for (Object v : listOfFixedValue) {
+                ap.add2FixedValueFromString(String.valueOf(v));
+            }
+            // Check fixed value
+            if (ap.getFixedValues() != null && !ap.getFixedValues().contains(ap.getValue())) {
+                throw new IllegalArgumentException("Cannot create property <" + ap.getName() + 
+                        "> invalid value <" + ap.getValue() + 
+                        "> expected one of " + ap.getFixedValues());
+            }
+        }
     }
 
     /**
@@ -180,15 +166,13 @@ public class FeatureJsonParser {
      */
     @SuppressWarnings("unchecked")
     public static FlippingStrategy parseFlipStrategyAsJson(String uid, String json) {
-        if (null == json || "".equals(json)) return null;
+        if (null == json || "".equals(json)) {
+            return null;
+        }
         try {
             return parseFlipStrategy(uid, (HashMap<String, Object>) objectMapper.readValue(json, HashMap.class));
-        } catch (JsonParseException e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("Cannot parse JSON " + json, e);
-        } catch (JsonMappingException e) {
-            throw new IllegalArgumentException("Cannot map JSON " + json, e);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Cannot read JSON " + json, e);
         }
     }
     
@@ -202,27 +186,15 @@ public class FeatureJsonParser {
      * @return flip strategy
      */
     @SuppressWarnings("unchecked")
-    public static FlippingStrategy parseFlipStrategy(String uid, HashMap<String, Object> flipMap) {
-        if (null == flipMap || flipMap.isEmpty()) return null;
-        String classType = null;
-        FlippingStrategy strategy = null;
-        try {
-            //Map<String, Object> flipMap = objectMapper.readValue(json, HashMap.class);
-            classType = (String) flipMap.get("type");
-            strategy = (FlippingStrategy) Class.forName(classType).newInstance();
-            HashMap<String, String> initparams = (HashMap<String, String>) flipMap.get("initParams");
-            // Initialized
-            strategy.init(uid, initparams);
-        } catch (InstantiationException e) {
-            throw new IllegalArgumentException(classType + " does not seems to have a DEFAULT constructor", e);
-        } catch (IllegalAccessException e) {
-            throw new IllegalArgumentException(classType + " does not seems to have a PUBLIC constructor", e);
-        } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException(classType + " has not been found within classpath, check syntax", e);
+    public static FlippingStrategy parseFlipStrategy(String uid, Map<String, Object> flipMap) {
+        if (null == flipMap || flipMap.isEmpty()) {
+            return null;
         }
-        return strategy;
+        String classType = (String) flipMap.get("type");
+        HashMap<String, String> initparams = (HashMap<String, String>) flipMap.get("initParams");
+        return MappingUtil.instanceFlippingStrategy(uid, classType, initparams);
     }
-
+    
     /**
      * Parse the json expression as array of {@link Feature}.
      *
@@ -233,8 +205,9 @@ public class FeatureJsonParser {
      */
     @SuppressWarnings("unchecked")
     public static Feature[] parseFeatureArray(String json) {
-        if (null == json || "".equals(json))
+        if (null == json || "".equals(json)) {
             return null;
+        }
         try {
             List<LinkedHashMap<String, Object>> flipMap = objectMapper.readValue(json, List.class);
             Feature[] fArray = new Feature[flipMap.size()];
@@ -243,12 +216,8 @@ public class FeatureJsonParser {
                 fArray[idx++] = parseFeatureMap(ll);
             }
             return fArray;
-        } catch (JsonParseException e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("Cannot parse JSON " + json, e);
-        } catch (JsonMappingException e) {
-            throw new IllegalArgumentException("Cannot map JSON " + json, e);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Cannot read JSON " + json, e);
         }
     }
 

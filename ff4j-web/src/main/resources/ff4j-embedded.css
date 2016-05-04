@@ -27,10 +27,10 @@ img {width: auto\9;height: auto;max-width: 100%;vertical-align: middle;border: 0
 button,input,select,textarea {margin: 0;font-size: 100%;vertical-align: middle;}
 button,input { *overflow: visible;line-height: normal;}
 button::-moz-focus-inner,input::-moz-focus-inner {padding: 0;border: 0;}
-button,html input[type="button"],input[type="reset"],input[type="submit"] {cursor: pointer;-webkit-appearance: button;}
+button,html input[type="button"],input[type="reset"],input[type="submit"] {cursor: pointer;-webkit-appearance: button;-moz-appearance:button}
 label,select,button,input[type="button"],input[type="reset"],input[type="submit"],input[type="radio"],input[type="checkbox"] {cursor: pointer;}
-input[type="search"] {-webkit-box-sizing: content-box;-moz-box-sizing: content-box;box-sizing: content-box;-webkit-appearance: textfield;}
-input[type="search"]::-webkit-search-decoration,input[type="search"]::-webkit-search-cancel-button {-webkit-appearance: none;}
+input[type="search"] {-webkit-box-sizing: content-box;-moz-box-sizing: content-box;box-sizing: content-box;-webkit-appearance: textfield;-moz-appearance: textfield}
+input[type="search"]::-webkit-search-decoration,input[type="search"]::-webkit-search-cancel-button {-webkit-appearance: none;-moz-appearance:none}
 textarea {overflow: auto;vertical-align: top;}
 @media print {* {color: #000 !important;text-shadow: none !important;background: transparent !important;box-shadow: none !important;}
 
@@ -6301,6 +6301,34 @@ a.badge:focus {
     z-index: 99;
 }
 
+.ff4j-properties {
+    color:#19599A;
+    display: inline;
+    position: relative;
+}
+.ff4j-properties:hover:after{
+    background: #19599A;
+    border-radius: 5px;
+    bottom: 26px;
+    color: #eeeeee;
+    content: attr(tooltip);
+    left: 20%;
+    padding: 5px 15px;
+    position: absolute;
+    z-index: 98;
+    width: 220px;
+}
+.ff4j-properties:hover:before {
+    border: solid;
+    border-color: #333 transparent;
+    border-width: 6px 6px 0 6px;
+    bottom: 20px;
+    content: "";
+    left: 50%;
+    position: absolute;
+    z-index: 99;
+}
+
 .subnavbar {
       margin-bottom: 2.5em;
     }
@@ -6393,6 +6421,23 @@ a.badge:focus {
   background-image: -o-linear-gradient(top, #1bd48a, #0f794f);
   background-image: linear-gradient(#1bd48a, #0f794f);
   border-color: #0f794f #0f794f hsl(156, 77%, 22%);
+  color: #fff !important;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.33);
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn-blue {
+  background-color: hsl(201, 100%, 18%) !important;
+  background-repeat: repeat-x;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#007dc1", endColorstr="#003b5b");
+  background-image: -khtml-gradient(linear, left top, left bottom, from(#007dc1), to(#003b5b));
+  background-image: -moz-linear-gradient(top, #007dc1, #003b5b);
+  background-image: -ms-linear-gradient(top, #007dc1, #003b5b);
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #007dc1), color-stop(100%, #003b5b));
+  background-image: -webkit-linear-gradient(top, #007dc1, #003b5b);
+  background-image: -o-linear-gradient(top, #007dc1, #003b5b);
+  background-image: linear-gradient(#007dc1, #003b5b);
+  border-color: #003b5b #003b5b hsl(201, 100%, 13%);
   color: #fff !important;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.33);
   -webkit-font-smoothing: antialiased;

@@ -28,15 +28,38 @@ import org.ff4j.property.PropertyLogLevel.LogLevel;
 /**
  * Custom property to code a logLevel.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class PropertyLogLevel extends AbstractProperty<LogLevel> {
+public class PropertyLogLevel extends Property<LogLevel> {
 
     /** Serial. */
     private static final long serialVersionUID = 1792311055570779010L;
 
     /** Expected Log Levels. */
-    public static enum LogLevel {TRACE, DEBUG, INFO, WARN, ERROR, FATAL};
+    public static enum LogLevel {TRACE, DEBUG, INFO, WARN, ERROR, FATAL}
+    
+    /**
+     * Constructor by string expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current log level
+     */
+    public PropertyLogLevel() {
+    }
+    
+    /**
+     * Constructor by string expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current log level
+     */
+    public PropertyLogLevel(String uid) {
+       super(uid);
+    }
     
     /**
      * Constructor by string expression.
@@ -60,7 +83,7 @@ public class PropertyLogLevel extends AbstractProperty<LogLevel> {
      *      current log level
      */
     public PropertyLogLevel(String uid, LogLevel lvl) {
-        super(uid, lvl, new HashSet<LogLevel>(Arrays.asList(LogLevel.values())));
+        super(uid, lvl, LogLevel.values());
     }
     
     /** {@inheritDoc} */

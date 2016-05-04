@@ -19,21 +19,23 @@ package org.ff4j.store;
  * limitations under the License.
  * #L%
  */
+import static org.ff4j.utils.MappingUtil.instanceFlippingStrategy;
+import static org.ff4j.utils.MappingUtil.toMap;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Map;
 
 import org.ff4j.core.Feature;
-import org.ff4j.core.FlippingStrategy;
-import org.ff4j.exception.FeatureAccessException;
-import org.ff4j.utils.ParameterUtils;
+
+import static org.ff4j.store.JdbcStoreConstants.*;
 
 /**
  * Map resultset into {@link Feature}
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class JdbcFeatureMapper implements JdbcStoreConstants {
+public class JdbcFeatureMapper {
     
     /**
      * Map feature result to bean.
@@ -46,27 +48,17 @@ public class JdbcFeatureMapper implements JdbcStoreConstants {
      */
     public Feature mapFeature(ResultSet rs) throws SQLException {
         // Feature
-        Feature f = null;
+        Feature f;
         boolean enabled = rs.getInt(COL_FEAT_ENABLE) > 0;
         String featUid = rs.getString(COL_FEAT_UID);
         f = new Feature(featUid, enabled, rs.getString(COL_FEAT_DESCRIPTION), rs.getString(COL_FEAT_GROUPNAME));
         // Strategy
         String strategy = rs.getString(COL_FEAT_STRATEGY);
         if (strategy != null && !"".equals(strategy)) {
-            try {
-                FlippingStrategy flipStrategy = (FlippingStrategy) Class.forName(strategy).newInstance();
-                flipStrategy.init(featUid, ParameterUtils.toMap(rs.getString(COL_FEAT_EXPRESSION)));
-                f.setFlippingStrategy(flipStrategy);
-            } catch (InstantiationException ie) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, no default constructor available", ie);
-            } catch (IllegalAccessException iae) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, no visible constructor", iae);
-            } catch (ClassNotFoundException e) {
-                throw new FeatureAccessException("Cannot instantiate Strategy, classNotFound", e);
-            }
+            Map < String, String > initParams = toMap(rs.getString(COL_FEAT_EXPRESSION));
+            f.setFlippingStrategy(instanceFlippingStrategy(featUid, strategy, initParams));
         }
         return f;
     }
-
 
 }

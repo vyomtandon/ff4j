@@ -21,11 +21,11 @@
 
 <features xmlns="http://www.ff4j.org/schema/ff4j" 
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	 xsi:schemaLocation="http://www.ff4j.org/schema/ff4j http://ff4j.org/schema/ff4j-1.2.0.xsd">
+	 xsi:schemaLocation="http://www.ff4j.org/schema/ff4j ../../main/resources/ff4j-1.2.0.xsd">
 
 	<!-- No Expression -->
 	<feature uid="first" enable="true" description="some desc">
-		<flipstrategy class="org.ff4j.strategy.OfficeHourStrategy" >
+		<flipstrategy class="org.ff4j.strategy.time.OfficeHourStrategy" >
 			<param name="monday"    	 value="08:00-12:00,13:30-18:00" />
 			<param name="tuesday"   	 value="08:00-12:00,13:30-18:00" />
 			<param name="wednesday" 	 value="08:00-12:00,13:30-18:00" />

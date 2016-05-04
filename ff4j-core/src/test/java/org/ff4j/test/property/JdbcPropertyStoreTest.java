@@ -23,7 +23,9 @@ package org.ff4j.test.property;
 import org.ff4j.property.store.JdbcPropertyStore;
 import org.ff4j.property.store.PropertyStore;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Test;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -60,6 +62,7 @@ public class JdbcPropertyStoreTest  extends AbstractPropertyStoreJunitTest {
         db = builder.setType(EmbeddedDatabaseType.HSQL).//
                 addScript("classpath:schema-ddl.sql").//
                 addScript("classpath:ff-store.sql"). //
+                
                 build();
     }
 
@@ -69,5 +72,25 @@ public class JdbcPropertyStoreTest  extends AbstractPropertyStoreJunitTest {
         db.shutdown();
     }
     
-
+    @Test
+    public void initJdbcPropertyStore() {
+        EmbeddedDatabaseBuilder b2 = new EmbeddedDatabaseBuilder();
+        EmbeddedDatabase db2 = b2.setType(EmbeddedDatabaseType.HSQL).//
+                build();
+        JdbcPropertyStore jdbcStore2 = new JdbcPropertyStore(db2, "ff4j.xml");
+        Assert.assertNotNull(jdbcStore2);
+    }
+    
+    @Test
+    public void testClear() {
+        EmbeddedDatabaseBuilder b2 = new EmbeddedDatabaseBuilder();
+        EmbeddedDatabase db2 = b2.setType(EmbeddedDatabaseType.HSQL).//
+                build();
+        JdbcPropertyStore jdbcStore2 = new JdbcPropertyStore(db2, "ff4j.xml");
+        Assert.assertNotNull(jdbcStore2);
+    }
+    
+   
+    
+    
 }

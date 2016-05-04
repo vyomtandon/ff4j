@@ -24,17 +24,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.ff4j.core.FlippingStrategy;
-import org.ff4j.utils.ParameterUtils;
+import org.ff4j.utils.MappingUtil;
 
 /**
  * Super class for {@link FlippingStrategy} implementation with utilities.
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public abstract class AbstractFlipStrategy implements FlippingStrategy {
 
     /** Initial parameters. */
-    private Map<String, String> initParams = new HashMap<String, String>();
+    protected Map<String, String> initParams = new HashMap<String, String>();
 
     /** ClassType. */
     private final String type = getClass().getCanonicalName();
@@ -57,7 +57,7 @@ public abstract class AbstractFlipStrategy implements FlippingStrategy {
      * @param paramName
      *            target parameter name
      */
-    protected void assertRequiredParameter(String paramName) {
+    public void assertRequiredParameter(String paramName) {
         if (!initParams.containsKey(paramName)) {
             String msg = String.format("Parameter '%s' is required for this FlippingStrategy", paramName);
             throw new IllegalArgumentException(msg);
@@ -67,7 +67,7 @@ public abstract class AbstractFlipStrategy implements FlippingStrategy {
     /** {@inheritDoc} */
     @Override
     public String toString() {
-        return this.getType() + "," + ParameterUtils.fromMap(getInitParams());
+        return this.getType() + "," + MappingUtil.fromMap(getInitParams());
     }
 
     /**

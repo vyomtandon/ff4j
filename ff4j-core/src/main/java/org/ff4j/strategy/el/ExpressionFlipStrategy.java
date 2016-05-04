@@ -1,5 +1,7 @@
 package org.ff4j.strategy.el;
 
+import java.io.Serializable;
+
 /*
  * #%L ff4j-core %% Copyright (C) 2013 Ff4J %% Licensed under the Apache License, Version 2.0 (the "License"); you may not use
  * this file except in compliance with the License. You may obtain a copy of the License at
@@ -24,12 +26,15 @@ import org.ff4j.strategy.AbstractFlipStrategy;
 /**
  * Allow to parse target expression.
  * 
- * @author clunven
+ * @author Cedrick Lunven (@clunven)
  */
-public class ExpressionFlipStrategy extends AbstractFlipStrategy {
+public class ExpressionFlipStrategy extends AbstractFlipStrategy implements Serializable {
+
+    /** Serial. */
+    private static final long serialVersionUID = 4739173170455721752L;
 
     /** Expected parameter. */
-    public static String PARAM_EXPRESSION = "expression";
+    public static final String PARAM_EXPRESSION = "expression";
 
     /** Cached init value. */
     private static Map<String, String> mapOfValue = new HashMap<String, String>();
@@ -41,6 +46,11 @@ public class ExpressionFlipStrategy extends AbstractFlipStrategy {
      * Default constructor using introspection.
      */
     public ExpressionFlipStrategy() {}
+    
+    public ExpressionFlipStrategy(String featureName, String expression) {
+        getInitParams().put(PARAM_EXPRESSION, expression);
+        mapOfValue.put(featureName, expression);
+    }
 
     /** {@inheritDoc} */
     @Override

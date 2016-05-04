@@ -14,13 +14,17 @@ package org.ff4j.cache;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.ff4j.core.Feature;
+import org.ff4j.property.Property;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
+import net.sf.ehcache.config.Configuration;
 
-import org.ff4j.core.Feature;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.ff4j.ehcache.FF4JEhCacheConstants.*;
 
 /**
  * Cache-aside implementation with EHCACHE.
@@ -31,50 +35,110 @@ import org.slf4j.LoggerFactory;
  * * Warn : DO NOT USE THIS CACHE WHEN WORKING WITH EXTERNAL FEATURESTORE (as Database) and cluster application : EACH NODE GOT
  * ITS MEMORY AND AN MODIFICATION IN STORE WON'T REFRESH THIS CACHE. Please use REDIS/MEMCACHED implementations.
  */
-public class FeatureCacheProviderEhCache implements FeatureCacheManager {
+public class FeatureCacheProviderEhCache implements FF4JCacheManager {
 
     /** Logger for the class. */
-    private static final Logger LOG = LoggerFactory.getLogger(FeatureStoreCacheProxy.class);
-
-    /** Default TTL is one hour. */
-    public static final long DEFAULT_TIME_TO_LIVE = 120L;
-
-    /** Default time to idle. */
-    public static final long DEFAULT_TIME_TO_IDLE = 120L;
-
-    /** Default cache name. */
-    public static final String DEFAULT_CACHENAME = "ff4j-cache";
-
+    private static final Logger LOG = LoggerFactory.getLogger(FF4jCacheProxy.class);
+    
+    /** Setup Cache configuration to work with Terracotta for instance. */
+    private Configuration cacheConfiguration;
+    
+    /** The cache manager. */
+    private CacheManager cacheManager;
+    
     /** Eh Cache - cache-aside mode utlization. */
-    private Cache cache = null;
+    private Cache cacheFeatures = null;
+    
+    /** Eh Cache - cache-aside mode utlization. */
+    private Cache cacheProperties = null;
 
     /**
      * Default constructor to allow IoC.
      */
-    public FeatureCacheProviderEhCache() {}
-
+    public FeatureCacheProviderEhCache() {
+    }
+    
+    /**
+     * Default constructor to allow IoC.
+     */
+    public FeatureCacheProviderEhCache(Configuration config) {
+        this.cacheConfiguration = config;
+    }
+   
     /** {@inheritDoc} */
     @Override
-    public void clear() {
-        getCache().flush();
+    public String getCacheProviderName() {
+        return "EHCACHE";
+    }
+    
+    /** {@inheritDoc} */
+    @Override
+    @SuppressWarnings("unchecked")
+    public Set<String> listCachedFeatureNames() {
+        return new HashSet<String>(getCacheFeatures().getKeys());
+    }
+
+    /**
+     * Ininitialize cache
+     */
+    private void initializeCache() {
+        if (null == getCacheConfiguration()) {
+            this.cacheManager = CacheManager.create();
+        } else {
+            this.cacheManager = CacheManager.create(getCacheConfiguration());  
+        }
+        if (!cacheManager.cacheExists(CACHENAME_FEATURES)) {
+            cacheManager.addCache(CACHENAME_FEATURES);
+        }
+        if (!cacheManager.cacheExists(CACHENAME_PROPERTIES)) {
+            cacheManager.addCache(CACHENAME_PROPERTIES);
+        }
+        cacheFeatures   = cacheManager.getCache(CACHENAME_FEATURES);
+        cacheProperties = cacheManager.getCache(CACHENAME_PROPERTIES);
+        LOG.debug("CacheManager initialized as '{}'", cacheFeatures.getName());
     }
 
     /** {@inheritDoc} */
     @Override
-    public void evict(String featureId) {
-        getCache().remove(featureId);
+    public void clearFeatures() {
+        getCacheFeatures().flush();
     }
 
     /** {@inheritDoc} */
     @Override
-    public void put(Feature feat) {
-        getCache().put(new Element(feat.getUid(), feat));
+    public void clearProperties() {
+        getCacheProperties().flush();
+        
     }
 
     /** {@inheritDoc} */
     @Override
-    public Feature get(String featureId) {
-        Element e = getCache().get(featureId);
+    public void evictFeature(String featureId) {
+        getCacheFeatures().remove(featureId);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void evictProperty(String propertyName) {
+        getCacheProperties().remove(propertyName);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void putFeature(Feature feat) {
+        getCacheFeatures().put(new Element(feat.getUid(), feat));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void putProperty(Property<?> property) {
+        getCacheProperties().put(new Element(property.getName(), property));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Feature getFeature(String featureId) {
+        Element e = getCacheFeatures().get(featureId);
         if (e != null) {
             return (Feature) e.getObjectValue();
         }
@@ -83,45 +147,109 @@ public class FeatureCacheProviderEhCache implements FeatureCacheManager {
 
     /** {@inheritDoc} */
     @Override
-    public Object getNativeCache() {
-        return getCache();
+    public Property<?> getProperty(String featureId) {
+        Element e = getCacheProperties().get(featureId);
+        if (e != null) {
+            return (Property<?>) e.getObjectValue();
+        }
+        return null;
     }
-    
+
     /** {@inheritDoc} */
-    @Override
     @SuppressWarnings("unchecked")
-    public Set<String> listCachedFeatureNames() {
-        return new HashSet<String>(getCache().getKeys());
+    @Override
+    public Set<String> listCachedPropertyNames() {
+        return new HashSet<String>(getCacheProperties().getKeys());
     }
 
     /** {@inheritDoc} */
     @Override
-    public String getCacheProviderName() {
-        return "EHCACHE";
+    public Object getFeatureNativeCache() {
+        return getCacheFeatures();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Object getPropertyNativeCache() {
+        return getCacheProperties();
     }
 
     /**
-     * Retrieve cache. If not exist, created default cache
-     * 
+     * Getter accessor for attribute 'cacheFeatures'.
+     *
      * @return
+     *       current value of 'cacheFeatures'
      */
-    private Cache getCache() {
-        if (cache == null) {
-            initializeCache();
-        }
-        return cache;
+    public Cache getCacheFeatures() {
+        if (cacheFeatures == null) initializeCache();
+        return cacheFeatures;
     }
 
     /**
-     * Ininitialize cache
+     * Setter accessor for attribute 'cacheFeatures'.
+     * @param cacheFeatures
+     * 		new value for 'cacheFeatures '
      */
-    private void initializeCache() {
-        CacheManager cacheManager = CacheManager.create();
-        if (!cacheManager.cacheExists(DEFAULT_CACHENAME)) {
-            cacheManager.addCache(DEFAULT_CACHENAME);
-        }
-        cache = cacheManager.getCache(DEFAULT_CACHENAME);
-        LOG.debug("CacheManager initialized as '{}'", cache.getName());
+    public void setCacheFeatures(Cache cacheFeatures) {
+        this.cacheFeatures = cacheFeatures;
+    }
+
+    /**
+     * Getter accessor for attribute 'cacheProperties'.
+     *
+     * @return
+     *       current value of 'cacheProperties'
+     */
+    public Cache getCacheProperties() {
+        if (cacheProperties == null) initializeCache();
+        return cacheProperties;
+    }
+
+    /**
+     * Setter accessor for attribute 'cacheProperties'.
+     * @param cacheProperties
+     * 		new value for 'cacheProperties '
+     */
+    public void setCacheProperties(Cache cacheProperties) {
+        this.cacheProperties = cacheProperties;
+    }
+
+    /**
+     * Getter accessor for attribute 'cacheConfiguration'.
+     *
+     * @return
+     *       current value of 'cacheConfiguration'
+     */
+    public Configuration getCacheConfiguration() {
+        return cacheConfiguration;
+    }
+
+    /**
+     * Setter accessor for attribute 'cacheConfiguration'.
+     * @param cacheConfiguration
+     * 		new value for 'cacheConfiguration '
+     */
+    public void setCacheConfiguration(Configuration cacheConfiguration) {
+        this.cacheConfiguration = cacheConfiguration;
+    }
+
+    /**
+     * Getter accessor for attribute 'cacheManager'.
+     *
+     * @return
+     *       current value of 'cacheManager'
+     */
+    public CacheManager getCacheManager() {
+        return cacheManager;
+    }
+
+    /**
+     * Setter accessor for attribute 'cacheManager'.
+     * @param cacheManager
+     * 		new value for 'cacheManager '
+     */
+    public void setCacheManager(CacheManager cacheManager) {
+        this.cacheManager = cacheManager;
     }   
 
 }

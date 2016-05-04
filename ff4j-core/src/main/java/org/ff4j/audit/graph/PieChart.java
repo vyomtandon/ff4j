@@ -27,7 +27,7 @@ import java.util.List;
 /**
  * Bean representing a pie chart.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class PieChart implements Serializable {
     
@@ -39,7 +39,17 @@ public class PieChart implements Serializable {
     
     /** sector for the graph. */
     private List < PieSector > sectors = new ArrayList<PieSector>();
-    
+
+    /**
+     * Constructor with title.
+     *
+     * @param t
+     *      target title.
+     */
+    public PieChart(String t) {
+        this.title = t;
+    }
+
     /** {@inheritDoc} */
     public String toJson() {
         StringBuilder sb = new StringBuilder("{");
@@ -63,16 +73,6 @@ public class PieChart implements Serializable {
     @Override
     public String toString() {
         return toJson();
-    }
-    
-    /**
-     * Constructor with title.
-     *
-     * @param t
-     *      target title.
-     */
-    public PieChart(String t) {
-        this.title = t;
     }
 
     /**

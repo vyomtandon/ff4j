@@ -29,7 +29,7 @@ import org.ff4j.utils.Util;
 /**
  * Bean representing a histogram graph.
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public class BarChart extends AbstractGraphFF4j {
     
@@ -71,11 +71,11 @@ public class BarChart extends AbstractGraphFF4j {
         sb.append(" \"title\" : \"" +  getTitle() + "\", ");
         sb.append(" \"series\" : [");
         boolean first = true;
-        for(String bs : series.keySet()) {
+        for(Map.Entry<String, BarSeries> bs : series.entrySet()) {
             if (!first) {
                 sb.append(",");
             }
-            sb.append(series.get(bs).toString());
+            sb.append(bs.getValue());
             first= false;
         }
         sb.append("],");

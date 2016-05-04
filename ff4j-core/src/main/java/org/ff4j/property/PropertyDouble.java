@@ -23,13 +23,29 @@ package org.ff4j.property;
 /**
  * Représentation of a property double
  *
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class PropertyDouble extends AbstractProperty< Double > {
+public class PropertyDouble extends Property< Double > {
 
     /** serial. */
     private static final long serialVersionUID = -134543098672660987L;
 
+    /**
+     * Default constructor.
+     */
+    public PropertyDouble() {
+    }
+    
+    /**
+     * Constructor by property name.
+     *
+     * @param name
+     *      property name
+     */
+    public PropertyDouble(String name) {
+        super(name);
+    }
+    
     /**
      * Constructor by string expression.
      *
@@ -39,6 +55,18 @@ public class PropertyDouble extends AbstractProperty< Double > {
      *      current double value
      */
     public PropertyDouble(String uid, String value) {
+       super(uid, value);
+    }
+    
+    /**
+     * Constructor by T expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current double value
+     */
+    public PropertyDouble(String uid, Double value) {
        super(uid, value);
     }
     

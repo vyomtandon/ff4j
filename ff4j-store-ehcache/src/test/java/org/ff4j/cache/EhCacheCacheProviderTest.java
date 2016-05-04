@@ -1,5 +1,14 @@
 package org.ff4j.cache;
 
+import org.ff4j.core.FeatureStore;
+import org.ff4j.property.store.InMemoryPropertyStore;
+import org.ff4j.property.store.PropertyStore;
+import org.ff4j.store.InMemoryFeatureStore;
+import org.ff4j.test.store.FeatureStoreTestSupport;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Test;
+
 /*
  * #%L
  * ff4j-cache-ehcache
@@ -21,27 +30,28 @@ package org.ff4j.cache;
  */
 
 import net.sf.ehcache.Cache;
-
-import org.ff4j.core.FeatureStore;
-import org.ff4j.store.InMemoryFeatureStore;
-import org.ff4j.test.store.AbstractStoreJUnitTest;
-import org.junit.After;
+import net.sf.ehcache.config.CacheConfiguration;
+import net.sf.ehcache.config.Configuration;
 
 /**
  * Class to test the EHCache {@link FeatureCacheProviderEhCache}.
  * 
  * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
  */
-public class EhCacheCacheProviderTest extends AbstractStoreJUnitTest {
+public class EhCacheCacheProviderTest extends FeatureStoreTestSupport {
 
     /** Cache Manager. */
-    private final FeatureCacheManager cache = new FeatureCacheProviderEhCache();
+    private final FF4JCacheManager cache = new FeatureCacheProviderEhCache();
+    
+    private FeatureStore  store  = new InMemoryFeatureStore("test-ehcacheProvider.xml");
+    
+    private PropertyStore pstore = new InMemoryPropertyStore("test-ehcacheProvider.xml");
 
     /** {@inheritDoc} */
     @Override
     public FeatureStore initStore() {
-        FeatureStore store = new InMemoryFeatureStore("test-ehcacheProvider.xml");
-        return new FeatureStoreCacheProxy(store, cache);
+       
+        return new FF4jCacheProxy(store, pstore,  cache);
     }
 
     /**
@@ -49,7 +59,21 @@ public class EhCacheCacheProviderTest extends AbstractStoreJUnitTest {
      */
     @After
     public void tearDown() {
-        ((Cache) cache.getNativeCache()).removeAll();
+        ((Cache) cache.getFeatureNativeCache()).removeAll();
+    }
+
+    @Test
+    public void initCacheProvider() {
+        Configuration managerConfiguration = new Configuration();
+        managerConfiguration.name("config");
+        managerConfiguration.setDefaultCacheConfiguration(new CacheConfiguration("toto", 1000));
+        
+        FeatureCacheProviderEhCache fcec = new FeatureCacheProviderEhCache(managerConfiguration);
+        Assert.assertNotNull(fcec.getCacheProviderName());
+        fcec.setCacheFeatures(fcec.getCacheFeatures());
+        fcec.setCacheProperties(fcec.getCacheProperties());
+        fcec.setCacheConfiguration(fcec.getCacheConfiguration());
+        fcec.setCacheManager(fcec.getCacheManager());
     }
 
 }

@@ -26,16 +26,32 @@ import java.util.Date;
 
 /**
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
-public class PropertyDate extends AbstractProperty< Date > {
+public class PropertyDate extends Property< Date > {
 
     /** serial. */
     private static final long serialVersionUID = -134543098672660987L;
     
     /** expected expression. */
-    private static final SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+    public static final SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
+    /**
+     * Default constructor.
+     */
+    public PropertyDate() {
+    }
+    
+    /**
+     * Constructor by property name.
+     *
+     * @param name
+     *      property name
+     */
+    public PropertyDate(String name) {
+        super(name);
+    }
+    
     /**
      * Constructor by string expression.
      *
@@ -48,14 +64,40 @@ public class PropertyDate extends AbstractProperty< Date > {
        super(uid, value);
     }
     
+    /**
+     * Constructor by string expression.
+     *
+     * @param uid
+     *      unique name
+     * @param lvl
+     *      current log level
+     */
+    public PropertyDate(String uid, Date date) {
+       super(uid, date);
+       
+    }
+    
     /** {@inheritDoc} */
     @Override
     public Date fromString(String v) {
         try {
             return SDF.parse(v);
         } catch (ParseException e) {
-           throw new IllegalArgumentException("Illegal expression for date, expecting yyyy-MM-dd HH:mm", e);
+           throw new IllegalArgumentException("Illegal expression for date, expecting yyyy-MM-dd HH:mm:ss", e);
         }
+    }
+    
+    /** 
+     * Serialized value as String
+     *
+     * @return
+     *      current value as a string or null
+     */
+    public String asString() {
+        if (value == null) {
+            return null;
+        }
+        return SDF.format(value);
     }
 
 }

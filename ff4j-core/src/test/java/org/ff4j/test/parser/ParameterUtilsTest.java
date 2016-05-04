@@ -22,14 +22,19 @@ package org.ff4j.test.parser;
 
 import java.lang.reflect.Constructor;
 
-import org.ff4j.utils.ParameterUtils;
+import org.ff4j.utils.MappingUtil;
 import org.junit.Test;
 
+/**
+ * Check Constructor
+ *
+ * @author Cedrick Lunven (@clunven)
+ */
 public class ParameterUtilsTest {
 
     @Test
     public void testConstructorParameterUtils() throws Exception {
-        Constructor<ParameterUtils> ce = ParameterUtils.class.getDeclaredConstructor();
+        Constructor<MappingUtil> ce = MappingUtil.class.getDeclaredConstructor();
         ce.setAccessible(true);
         ce.newInstance();
     }

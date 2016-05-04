@@ -25,13 +25,22 @@ import java.io.Serializable;
 /**
  * Cache entry with object and inserted Date.
  * 
- * @author <a href="mailto:cedrick.lunven@gmail.com">Cedrick LUNVEN</a>
+ * @author Cedrick Lunven (@clunven)
  */
 public final class InMemoryCacheEntry<T> implements Serializable {
 
     /** serial. */
     private static final long serialVersionUID = -1444331517339058103L;
+    
+    /** Default TTL is one hour. */
+    public static final long DEFAULT_TTL = 3600L;
 
+    /** externalized as constant. */
+    public static final long TO_MILLIS = 1000L;
+
+    /** TTL of this entry. */
+    private long timeToLive = DEFAULT_TTL;
+    
     /** Insertion date, allow to compute time-to-live. */
     private final long insertedDate;
 
@@ -47,6 +56,28 @@ public final class InMemoryCacheEntry<T> implements Serializable {
     public InMemoryCacheEntry(T entry) {
         this.entry = entry;
         this.insertedDate = System.currentTimeMillis();
+    }
+    
+    /**
+     * Parameterized contructor with target cached object.
+     * 
+     * @param entry
+     *            cached object
+     */
+    public InMemoryCacheEntry(T entry, long timeToLive) {
+        this.entry = entry;
+        this.insertedDate = System.currentTimeMillis();
+        this.timeToLive = timeToLive;
+    }
+    
+    /**
+     * Compute the timeout property.
+     *
+     * @return
+     *      time to live
+     */
+    public boolean hasReachTimeToLive() {
+        return (System.currentTimeMillis() - getInsertedDate()) >= (TO_MILLIS * timeToLive);
     }
 
     /**

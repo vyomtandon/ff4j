@@ -3,9 +3,11 @@ package org.ff4j.cache;
 import org.ff4j.core.Feature;
 import org.ff4j.core.FeatureStore;
 import org.ff4j.store.InMemoryFeatureStore;
-import org.ff4j.test.TestsFf4jConstants;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
+
+import static org.ff4j.test.TestsFf4jConstants.*;
 
 /*
  * #%L
@@ -26,24 +28,24 @@ import org.junit.Test;
  * limitations under the License.
  * #L%
  */
-
-public class RedisCacheManagerTestIT implements TestsFf4jConstants {
+@Ignore
+public class RedisCacheManagerTestIT {
 
     @Test
     public void testPutGet() {
        
         // Initializing cache manager
-        FeatureCacheManager cache = new FeatureCacheProviderRedis();
+        FF4JCacheManager cache = new FeatureCacheProviderRedis();
 
         // Initializing Features for test
         FeatureStore store = new InMemoryFeatureStore(TEST_FEATURES_FILE);
         Feature fold = store.read(F4);
         
         // Put in Cache
-        cache.put(fold);
+        cache.putFeature(fold);
         
         // Retrieve object
-        Feature fcached = cache.get(F4);
+        Feature fcached = cache.getFeature(F4);
         Assert.assertEquals(fcached.getUid(), fold.getUid());
         Assert.assertEquals(fcached.getPermissions(), fold.getPermissions());
 

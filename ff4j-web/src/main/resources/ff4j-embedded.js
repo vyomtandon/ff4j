@@ -575,5 +575,13 @@
 
 	}(window.jQuery);
 
+/** 
+ * Remove first part of url : before '?' or '#'
+ * 
+ * @param url target URL to split
+ */
+function ff4j_getPathFromUrl(url) {
+	return url.split(/[?#]/)[0];
+}
 
 
